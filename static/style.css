@@ -1,58 +1,455 @@
 :root {
-  --bg: #0b0f0c;
-  --card: #101512;
-  --muted: #8aa19a;
-  --border: #1b241f;
-  --text: #e6f0ec;
-  --green: #24a663;
+    --bg: #0f172a;
+    --bg-soft: #020617;
+    --card: #111827;
+    --accent: #22c55e;
+    --accent-soft: rgba(34, 197, 94, 0.08);
+    --text: #f9fafb;
+    --muted: #9ca3af;
+    --border: #1f2933;
+    --danger: #ef4444;
 }
-* { box-sizing: border-box; }
-html, body { height: 100%; }
-body.ue-body, body { margin: 0; color: var(--text); background: var(--bg);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial; }
-.ue-topbar { border-bottom: 1px solid var(--border); background: #0d120f; position: sticky; top:0; z-index: 20; }
-.ue-topbar-inner { max-width: 1120px; margin: 0 auto; padding: 12px 16px; display:flex; align-items:center; justify-content:space-between; }
-.ue-brand { font-weight: 800; letter-spacing:.3px; display:flex; gap:6px; align-items:center; }
-.ue-brand-uber { color:#fff; }
-.ue-brand-eats { color: var(--green); }
-.ue-brand-sub { color: var(--muted); font-weight:600; }
-.ue-brand-suffix { color:#b9c7c1; font-weight:700; margin-left:8px; }
-.ue-nav { display:flex; gap:12px; }
-.ue-nav-link { padding:6px 10px; border-radius:10px; text-decoration:none; color:#bcd7cd; border:1px solid transparent; }
-.ue-nav-link:hover { border-color:var(--border); background:#0f1411; }
-.ue-nav-active { background:#0f1411; border-color:var(--border); color:#eaf6f0; }
-.ue-container { max-width: 1120px; margin: 24px auto; padding: 0 16px; }
-.ue-card { background: var(--card); border:1px solid var(--border); border-radius: 16px; padding: 16px 18px; }
-.ue-title { margin: 0 0 6px; }
-.ue-subtitle { margin: 0 0 14px; color: var(--muted); }
-.ue-grid { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:12px; margin-bottom: 12px; }
-@media (max-width: 860px) { .ue-grid { grid-template-columns: 1fr; } }
-.ue-field label { display:block; font-size:12px; color: var(--muted); margin-bottom: 6px; }
-.ue-field input, .ue-field select { width:100%; padding:10px 12px; border-radius:12px; outline:none;
-  border:1px solid var(--border); background:#0e1310; color:var(--text); }
-.ue-btn { display:inline-flex; align-items:center; gap:8px; border-radius:12px; padding:10px 14px; border:1px solid var(--border); background:#0e1310; color:var(--text); cursor:pointer; }
-.ue-btn:hover { background:#101613; }
-.ue-btn-primary { background: #1b2e25; border-color:#224536; color:#eaf6f0; }
-.ue-btn-primary:hover { background:#1f352a; }
-.ue-btn-ghost { background:#0e1310; }
-.ue-btn-danger { background:#ff6b6b; color:#000; border-color:#ff6b6b; }
-.ue-muted { color: var(--muted); }
-.ue-footer { border-top: 1px solid var(--border); margin-top: 28px; }
-.ue-footer-inner { max-width:1120px; margin:0 auto; padding: 14px 16px; display:flex; justify-content:space-between; color:var(--muted); }
-.ue-health { color:#9cddc0; text-decoration:none; }
-.ue-health:hover { text-decoration:underline; }
-.login-wrap{max-width:420px; margin:12vh auto; background:var(--card); border:1px solid var(--border); border-radius:14px; padding:20px}
-.ue-input{width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); background:#0e1310; color:var(--text)}
-.ue-error{color:#ff6b6b; margin-top:8px}
-.ue-toolbar{display:flex; gap:8px; align-items:center; margin-bottom:10px}
-.ue-stat{border:1px solid var(--border); border-radius:14px; padding:12px}
-.ue-stat-title{color:var(--muted); font-size:12px}
-.ue-stat-value{font-weight:800; font-size:26px}
-.bars .bar{height:14px; background:#0a0a0a; border:1px solid var(--border); border-radius:8px; overflow:hidden}
-.bars .bar>div{height:100%; background:var(--green)}
-.bar-row{display:grid; grid-template-columns:auto 1fr auto; gap:8px; align-items:center; margin:6px 0}
-.trend{display:flex; gap:6px; align-items:flex-end; height:80px}
-.trend .col{width:12px; background:var(--green); border:1px solid var(--border); border-radius:3px}
-.ue-table{width:100%; border-collapse:collapse}
-.ue-table th,.ue-table td{border-bottom:1px solid var(--border); padding:8px 6px; text-align:left}
-.mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        "Inter", sans-serif;
+    background: radial-gradient(circle at top left, #111827, #020617 50%, #000);
+    color: var(--text);
+}
+
+/* Header */
+
+.ue-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 40px;
+    background: rgba(15, 23, 42, 0.98);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+    backdrop-filter: blur(14px);
+}
+
+.ue-header-left {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+}
+
+.ue-logo {
+    font-weight: 700;
+    font-size: 20px;
+    letter-spacing: 0.02em;
+}
+
+.ue-logo span {
+    color: var(--accent);
+}
+
+.ue-nav a {
+    margin-right: 16px;
+    text-decoration: none;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.ue-nav a:hover {
+    color: var(--text);
+}
+
+.ue-header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.ue-location {
+    display: flex;
+    flex-direction: column;
+    font-size: 12px;
+}
+
+.ue-location-label {
+    color: var(--muted);
+}
+
+.ue-location-value {
+    color: var(--text);
+    font-weight: 500;
+}
+
+/* Layout */
+
+.ue-main {
+    max-width: 1160px;
+    margin: 32px auto 64px;
+    padding: 0 20px;
+}
+
+/* Buttons */
+
+.ue-btn-primary {
+    border: none;
+    outline: none;
+    background: var(--accent);
+    color: #041016;
+    padding: 10px 18px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.08s ease;
+}
+
+.ue-btn-primary:hover {
+    background: #16a34a;
+    transform: translateY(-1px);
+}
+
+.ue-btn-outline {
+    background: transparent;
+    color: var(--text);
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.5);
+    padding: 8px 16px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.ue-btn-outline:hover {
+    border-color: var(--accent);
+}
+
+/* Hero */
+
+.ue-hero {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 32px;
+    align-items: flex-start;
+    margin-bottom: 40px;
+}
+
+.ue-hero-left h1 {
+    font-size: 32px;
+    margin-bottom: 10px;
+}
+
+.ue-hero-sub {
+    color: var(--muted);
+    font-size: 14px;
+    max-width: 480px;
+    margin-bottom: 18px;
+}
+
+.ue-search-form {
+    background: radial-gradient(circle at top left, #0b1120, #020617 60%);
+    border-radius: 18px;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.ue-textarea {
+    width: 100%;
+    min-height: 90px;
+    resize: vertical;
+    background: #020617;
+    border-radius: 12px;
+    padding: 10px 12px;
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    color: var(--text);
+    font-size: 14px;
+}
+
+.ue-textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.ue-hero-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.ue-hero-tags span {
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.9);
+    color: var(--muted);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    font-size: 12px;
+}
+
+/* Cards */
+
+.ue-card {
+    background: rgba(15, 23, 42, 0.95);
+    border-radius: 18px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    padding: 16px 18px;
+    box-shadow: 0 14px 40px rgba(15, 23, 42, 0.55);
+}
+
+.ue-card h3 {
+    margin-top: 0;
+    font-size: 16px;
+    margin-bottom: 6px;
+}
+
+.ue-card p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--muted);
+}
+
+.ue-card-metric ul {
+    padding-left: 18px;
+    margin: 10px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+/* Right column */
+
+.ue-hero-right {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.ue-card-orders .ue-order {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.9);
+}
+
+.ue-card-orders .ue-order:last-child {
+    border-bottom: none;
+}
+
+.ue-order-title {
+    font-size: 14px;
+}
+
+.ue-order-meta {
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.ue-order-btn {
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.6);
+    background: transparent;
+    color: var(--text);
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.ue-order-btn:hover {
+    border-color: var(--accent);
+}
+
+/* Grid section */
+
+.ue-grid {
+    margin-top: 30px;
+}
+
+.ue-grid-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.ue-grid-title-row h2 {
+    margin: 0;
+    font-size: 20px;
+}
+
+.ue-grid-sub {
+    font-size: 13px;
+    color: var(--muted);
+}
+
+.ue-grid-cards {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.ue-card-small {
+    font-size: 13px;
+}
+
+/* Agent widget */
+
+.agent-fab {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    width: 52px;
+    height: 52px;
+    border-radius: 999px;
+    border: none;
+    background: var(--accent);
+    color: #02100a;
+    font-size: 24px;
+    cursor: pointer;
+    box-shadow: 0 12px 30px rgba(34, 197, 94, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.12s ease, opacity 0.12s ease;
+    z-index: 40;
+}
+
+.agent-fab:hover {
+    transform: translateY(-2px);
+}
+
+.agent-hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.agent-widget {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    width: 340px;
+    max-height: 480px;
+    background: rgba(15, 23, 42, 0.98);
+    border-radius: 18px;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    box-shadow: 0 20px 60px rgba(15, 23, 42, 0.8);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transform: translateY(20px);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.18s ease, opacity 0.18s ease;
+    z-index: 50;
+}
+
+.agent-open {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.agent-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: linear-gradient(to right, #16a34a, #22c55e);
+    color: #04100b;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.agent-close {
+    background: transparent;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+.agent-body {
+    flex: 1;
+    padding: 10px 12px;
+    overflow-y: auto;
+    font-size: 13px;
+}
+
+.agent-message {
+    max-width: 90%;
+    margin-bottom: 8px;
+    padding: 8px 10px;
+    border-radius: 12px;
+    line-height: 1.4;
+}
+
+.agent-message-bot {
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid rgba(148, 163, 184, 0.4);
+}
+
+.agent-message-user {
+    margin-left: auto;
+    background: var(--accent);
+    color: #02100a;
+}
+
+.agent-input-row {
+    display: flex;
+    gap: 6px;
+    padding: 8px 10px;
+    border-top: 1px solid rgba(148, 163, 184, 0.3);
+    background: rgba(15, 23, 42, 0.98);
+}
+
+.agent-input-row input {
+    flex: 1;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.5);
+    background: #020617;
+    color: var(--text);
+    padding: 6px 10px;
+    font-size: 13px;
+}
+
+.agent-input-row input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+/* Responsive */
+
+@media (max-width: 900px) {
+    .ue-hero {
+        grid-template-columns: 1fr;
+    }
+
+    .ue-main {
+        margin-top: 16px;
+    }
+
+    .ue-grid-cards {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 640px) {
+    .ue-header {
+        padding: 10px 16px;
+    }
+
+    .agent-widget {
+        right: 12px;
+        left: 12px;
+        width: auto;
+    }
+
+    .ue-grid-cards {
+        grid-template-columns: 1fr;
+    }
+}

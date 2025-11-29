@@ -1,143 +1,134 @@
-import os, hmac
-from functools import wraps
-from datetime import datetime
-from flask import Flask, jsonify, request, render_template, redirect, url_for, session, Response
-from core.hybrid_engine import HybridEngine
-from core.audit import Audit
-from core.audit_reader import query_audit, export_csv_rows, compute_stats
-from core.mailer import maybe_send_decision_email
+from flask import Flask, render_template, request, jsonify
 from dotenv import load_dotenv
+import os
+
 load_dotenv()
 
+app = Flask(__name__)
 
-RULES_PATH = os.getenv("RULES_PATH", "policies/policy_rules_base.json")
-MODEL_PATH = os.getenv("MODEL_PATH", "models/refund_classifier.pkl")
-DB_PATH    = os.getenv("DB_PATH", "audit.db")
+# ----------------------------------------------------
+# TODO: wire in YOUR real model / pipeline here
+# ----------------------------------------------------
+# Example skeleton – replace with your actual loading code.
+#
+# from joblib import load
+# model = load("models/complaint_model.joblib")
+# vectorizer = load("models/vectorizer.joblib")
+#
+# def classify_complaint(text: str) -> dict:
+#     X = vectorizer.transform([text])
+#     y_proba = model.predict_proba(X)[0]
+#     y_pred = model.classes_[y_proba.argmax()]
+#     confidence = float(y_proba.max())
+#     return {
+#         "label": y_pred,
+#         "confidence": confidence,
+#         "category": "Delivery issue"  # or map label → readable category
+#     }
 
-app = Flask(__name__, static_folder="static", template_folder="templates")
-app.secret_key  = os.getenv("FLASK_SECRET_KEY", "dev-change-this")
+def classify_complaint(text: str) -> dict:
+    """
+    Dummy implementation so the app runs.
+    Replace this with your actual model call.
+    """
+    lowered = text.lower()
 
-ADMIN_USER      = os.getenv("ADMIN_USER", "Admin")
-ADMIN_PASSWORD  = os.getenv("ADMIN_PASSWORD", "admin123")
+    if "cold" in lowered or "bad" in lowered or "stale" in lowered:
+        label = "food_quality"
+        category = "Food Quality"
+    elif "late" in lowered or "delay" in lowered or "time" in lowered:
+        label = "late_delivery"
+        category = "Delivery Delay"
+    elif "missing" in lowered or "item" in lowered:
+        label = "missing_items"
+        category = "Missing Items"
+    elif "refund" in lowered or "money" in lowered or "charge" in lowered:
+        label = "refund_billing"
+        category = "Payment / Refund"
+    else:
+        label = "other"
+        category = "Other"
 
-engine = HybridEngine(RULES_PATH, MODEL_PATH)
-audit  = Audit(DB_PATH)
-
-def _coerce(d: dict) -> dict:
     return {
-        "order_id": str(d.get("order_id","")).strip(),
-        "order_status": str(d.get("order_status","")).strip().lower().replace(" ","_").replace("-", "_"),
-        "refund_history_30d": int(d.get("refund_history_30d",0)),
-        "handoff_photo": str(d.get("handoff_photo","")).lower() in ("1","true","yes","y","t"),
-        "courier_rating": float(d.get("courier_rating",4.7)),
-        "email": (d.get("email") or "").strip(),
+        "label": label,
+        "category": category,
+        "confidence": 0.85  # placeholder
     }
 
-def admin_required(fn):
-    @wraps(fn)
-    def _wrap(*args, **kwargs):
-        if not session.get("is_admin"):
-            return redirect(url_for("admin_login", next=request.path))
-        return fn(*args, **kwargs)
-    return _wrap
 
-@app.get("/api/health/")
-def health():
-    return jsonify({"status": "ok"}), 200
+def build_agent_reply(text: str, analysis: dict) -> str:
+    """
+    Turn the model output into a human-style agent response.
+    You can customise tone here.
+    """
+    category = analysis.get("category", "your issue")
+    label = analysis.get("label", "other")
+    confidence = analysis.get("confidence", 0.0)
 
-@app.post("/api/decide/")
-def decide():
-    data = request.get_json(silent=True) or {}
-    required = {"order_id","order_status","refund_history_30d","handoff_photo","courier_rating"}
-    if not required.issubset(data.keys()):
-        return jsonify({"error": f"missing fields: {list(required - set(data.keys()))}"}), 400
-    case = _coerce(data)
-    out = engine.predict(case)
-    audit.log(case["order_id"], out, case)
-    if case.get("email"):
-        maybe_send_decision_email(case.get("email"), case, out)
-    if out.get("source") == "system" and "No ML model" in (out.get("reason") or ""):
-        out["reason"] += f" (looked for: {MODEL_PATH})"
-    return jsonify(out), 200
+    base = f"I've reviewed your complaint and it looks like a *{category}* issue."
+    extra = ""
 
-@app.post("/api/decide")
-def decide_alias():
-    return decide()
+    if label == "late_delivery":
+        extra = (
+            " I’m sorry your order was delayed. I’ve tagged this as a **delivery delay** "
+            "and it should be reviewed for ETA mismatch and potential compensation."
+        )
+    elif label == "food_quality":
+        extra = (
+            " That’s not the experience we want you to have with your food. "
+            "I’ve flagged this as a **food quality** issue for the restaurant and support team."
+        )
+    elif label == "missing_items":
+        extra = (
+            " I’ve marked this as a **missing items** issue so support can verify your order "
+            "and process a refund or re-delivery where possible."
+        )
+    elif label == "refund_billing":
+        extra = (
+            " I’ve tagged this as a **payment / refund** concern so billing support can look into "
+            "charges and possible reversal."
+        )
+    else:
+        extra = (
+            " I’ve marked this as a **general support** issue so a human agent can review it in detail."
+        )
 
-@app.get("/api/audit/")
-@admin_required
-def api_audit_list():
-    page = int(request.args.get("page", "1"))
-    page_size = int(request.args.get("page_size", "50"))
-    items, total = query_audit(DB_PATH, page=page, page_size=page_size)
-    return jsonify({"items": items, "total": total, "page": page, "page_size": page_size})
+    conf_text = f" (model confidence: {confidence:.0%})"
+    return base + extra + conf_text
 
-@app.get("/api/audit/stats")
-@admin_required
-def api_audit_stats():
-    days = int(request.args.get("days", "14"))
-    return jsonify(compute_stats(DB_PATH, days=days))
 
-@app.get("/api/audit/export.csv")
-@admin_required
-def api_audit_export_csv():
-    rows = export_csv_rows(DB_PATH)
-    def gen():
-        yield "id,ts,order_id,decision,source,confidence,rule_id,category,reason,case_json\n"
-        for r in rows:
-            def esc(x):
-                if x is None: return ""
-                s = str(x).replace('"','""')
-                return f'"{s}"'
-            yield ",".join([
-                esc(r["id"]), esc(r["ts"]), esc(r["order_id"]),
-                esc(r["decision"]), esc(r["source"]), esc(r["confidence"]),
-                esc(r["rule_id"]), esc(r["category"]), esc(r["reason"]),
-                esc(r["case_json"]),
-            ]) + "\n"
-    fname = f"audit_export_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
-    return Response(gen(), mimetype="text/csv",
-                    headers={"Content-Disposition": f"attachment; filename={fname}"})
-
-@app.get("/admin/login")
-def admin_login():
-    if session.get("is_admin"):
-        return redirect(url_for("admin_home"))
-    next_url = request.args.get("next") or url_for("admin_home")
-    return render_template("admin_login.html", next_url=next_url, error=None)
-
-@app.post("/admin/login")
-def admin_login_post():
-    user = (request.form.get("username") or "").strip()
-    pw   = (request.form.get("password") or "").strip()
-    next_url = request.form.get("next_url") or url_for("admin_home")
-    import hmac
-    ok_user = hmac.compare_digest(user, ADMIN_USER)
-    ok_pass = hmac.compare_digest(pw, ADMIN_PASSWORD)
-    if not (ok_user and ok_pass):
-        return render_template("admin_login.html", next_url=next_url, error="Invalid credentials")
-    session["is_admin"] = True
-    session["admin_user"] = user
-    return redirect(next_url)
-
-@app.post("/admin/logout")
-def admin_logout():
-    session.clear()
-    return redirect(url_for("admin_login"))
-
-@app.get("/")
-def ui_home():
+@app.route("/")
+def index():
     return render_template("index.html")
 
-@app.get("/audit")
-@admin_required
-def ui_audit():
-    return render_template("audit.html")
 
-@app.get("/admin")
-@admin_required
-def admin_home():
-    return render_template("admin.html")
+@app.route("/api/agent", methods=["POST"])
+def agent_endpoint():
+    """
+    Agent-style endpoint: accepts JSON {message: "..."} and
+    returns {reply: "...", analysis: {...}}.
+    """
+    data = request.get_json() or {}
+    message = (data.get("message") or "").strip()
+
+    if not message:
+        return jsonify({"error": "No message provided"}), 400
+
+    analysis = classify_complaint(message)
+    reply = build_agent_reply(message, analysis)
+
+    return jsonify({
+        "reply": reply,
+        "analysis": analysis
+    })
+
+
+@app.route("/healthz")
+def health():
+    return {"status": "ok"}, 200
+
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+    # Dev only – in production we use gunicorn
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port, debug=True)
