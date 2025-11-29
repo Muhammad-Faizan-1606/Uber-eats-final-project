@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Agentic Complaint AI – Decider</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body class="ue-body">
+<header class="ue-topbar">
+  <div class="ue-topbar-inner">
+    <div class="ue-brand">
+      <span class="ue-brand-uber">Uber</span><span class="ue-brand-eats">Eats</span><span class="ue-brand-sub">-style</span>
+      <span class="ue-brand-suffix">Decider</span>
+    </div>
+    <nav class="ue-nav">
+      <a href="/" class="ue-nav-link ue-nav-active">Decider</a>
+      <a href="/audit" class="ue-nav-link">Audit</a>
+      <a href="/admin" class="ue-nav-link">Admin</a>
+    </nav>
+  </div>
+</header>
+
+<main class="ue-container">
+  <section class="ue-card">
+    <h1 class="ue-title">Decision Engine</h1>
+    <p class="ue-subtitle">Enter order details to get a decision (policy + ML). No login required.</p>
+    <div class="ue-grid">
+      <div class="ue-field"><label>Order ID</label><input id="order_id" placeholder="ORD123"></div>
+      <div class="ue-field"><label>Order status</label>
+        <select id="order_status">
+          <option value="missing_delivery">missing_delivery</option>
+          <option value="damaged_item">damaged_item</option>
+          <option value="wrong_item">wrong_item</option>
+          <option value="late_delivery">late_delivery</option>
+        </select>
+      </div>
+      <div class="ue-field"><label>Refunds (last 30d)</label><input id="refund_history_30d" type="number" value="0" min="0"></div>
+      <div class="ue-field"><label>Handoff photo?</label>
+        <select id="handoff_photo"><option value="false">false</option><option value="true">true</option></select>
+      </div>
+      <div class="ue-field"><label>Courier rating</label><input id="courier_rating" type="number" step="0.1" value="4.7"></div>
+      <div class="ue-field"><label>Email (optional)</label><input id="email" type="email" placeholder="customer@example.com"></div>
+    </div>
+    <div><button class="ue-btn ue-btn-primary" id="go">Decide</button></div>
+    <div id="err" style="display:none;color:#ffb3b3;margin-top:10px;"></div>
+    <div id="card" class="ue-card" style="margin-top:14px; display:none;">
+      <div style="display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+        <div><div class="ue-muted" style="font-size:12px;">DECISION</div><div id="c_dec" style="font-size:24px; font-weight:800;"></div></div>
+        <div><div class="ue-muted" style="font-size:12px;">SOURCE</div><div id="c_src" style="font-size:18px; font-weight:600;"></div></div>
+        <div><div class="ue-muted" style="font-size:12px;">CONFIDENCE</div><div id="c_conf" class="mono" style="font-size:18px;"></div></div>
+      </div>
+      <div style="margin-top:10px;"><span class="ue-btn ue-btn-ghost">Reason</span> <span id="c_reason"></span></div>
+      <details style="margin-top:10px;"><summary class="ue-btn ue-btn-ghost">Payload</summary><pre id="c_payload" class="ue-pre"></pre></details>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = (id)=>document.getElementById(id);
+const show = (el, on)=> el.style.display = on ? "" : "none";
+function showError(msg){$("err").textContent=msg; $("err").style.display="";}
+function hideError(){ $("err").style.display="none"; $("err").textContent=""; }
+$("go").onclick = async () => {
+  hideError();
+  const payload = {
+    order_id: $("order_id").value.trim(),
+    order_status: $("order_status").value.trim(),
+    refund_history_30d: Number($("refund_history_30d").value),
+    handoff_photo: $("handoff_photo").value === "true",
+    courier_rating: Number($("courier_rating").value),
+  };
+  const email = $("email").value.trim(); if (email) payload.email = email;
+  try {
+    const r = await fetch("/api/decide", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
+    if (!r.ok) { const text = await r.text(); showError(`API error ${r.status}: ${text}`); show($("card"), false); return; }
+    const j = await r.json();
+    $("c_dec").textContent = (j.decision || "—").toLowerCase();
+    $("c_src").textContent = j.source || "—";
+    $("c_conf").textContent = j.confidence != null ? Number(j.confidence).toFixed(2) : "—";
+    $("c_reason").textContent = j.reason || "—";
+    $("c_payload").textContent = JSON.stringify({input: payload, output: j}, null, 2);
+    show($("card"), true);
+  } catch (e) {
+    showError("Network/JS error: " + (e?.message || e));
+    show($("card"), false);
+  }
+};
+</script>
+</body>
+</html>

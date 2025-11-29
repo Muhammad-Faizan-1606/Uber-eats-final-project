@@ -1,0 +1,115 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Audit • Agentic Complaint AI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="ue-header">
+  <div class="ue-brand"><span class="ue-uber">Uber</span><span class="ue-eats">Eats</span>-style</div>
+  <nav class="ue-nav">
+    <a href="/">Decider</a>
+    <a href="/audit" class="active">Audit</a>
+    <a href="/admin">Admin</a>
+  </nav>
+</header>
+
+<main class="ue-container">
+  <section class="ue-card">
+    <h1 class="ue-title">Audit Log</h1>
+    <div class="ue-toolbar">
+      <select id="days">
+        <option value="7">7d</option>
+        <option value="14" selected>14d</option>
+        <option value="30">30d</option>
+      </select>
+      <a class="ue-btn ue-btn-ghost" id="exp" href="/api/audit/export.csv" target="_blank">Export CSV</a>
+    </div>
+
+    <div class="ue-grid">
+      <div class="ue-stat">
+        <div class="ue-stat-title">Total</div>
+        <div class="ue-stat-value" id="s_total">—</div>
+      </div>
+      <div class="ue-stat">
+        <div class="ue-stat-title">Decision mix</div>
+        <div id="s_decision" class="bars"></div>
+      </div>
+      <div class="ue-stat">
+        <div class="ue-stat-title">Source mix</div>
+        <div id="s_source" class="bars"></div>
+      </div>
+      <div class="ue-stat">
+        <div class="ue-stat-title">Daily volume</div>
+        <div id="s_trend" class="trend"></div>
+      </div>
+    </div>
+
+    <h3 class="ue-subtitle">Latest 50</h3>
+    <div style="overflow:auto">
+      <table class="ue-table">
+        <thead><tr><th>ID</th><th>Time</th><th>Order</th><th>Decision</th><th>Source</th><th>Conf</th><th>Rule</th><th>Reason</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<footer class="ue-footer"><div>© Agentic Complaint AI</div></footer>
+
+<script>
+const daysEl=document.getElementById('days');
+const s_total=document.getElementById('s_total');
+const s_decision=document.getElementById('s_decision');
+const s_source=document.getElementById('s_source');
+const s_trend=document.getElementById('s_trend');
+const tbody=document.getElementById('tbody');
+const expEl=document.getElementById('exp');
+
+function pct(x){return Math.max(0,Math.min(100,Math.round(x*100)));}
+
+function bars(el,obj){
+  if(!obj||Object.keys(obj).length===0){el.innerHTML='<div class="ue-muted">No data</div>';return;}
+  const tot=Object.values(obj).reduce((a,b)=>a+b,0)||1;
+  el.innerHTML=Object.entries(obj).sort((a,b)=>b[1]-a[1]).map(([k,v])=>{
+    const p=v/tot;
+    return `<div class="bar-row"><div class="bar-label">${k}</div><div class="bar"><div style="width:${pct(p)}%"></div></div><div class="bar-val">${(p*100).toFixed(1)}% • ${v}</div></div>`;
+  }).join('');
+}
+function trend(el,items){
+  if(!items||items.length===0){el.innerHTML='';return;}
+  const max=Math.max(1,...items.map(x=>x.count));
+  el.innerHTML=items.map(x=>{
+    const h=Math.round((x.count/max)*78)+2;
+    return `<div class="col" title="${x.day}: ${x.count}" style="height:${h}px"></div>`;
+  }).join('');
+}
+function row(r){
+  return `<tr>
+    <td class="mono">${r.id}</td>
+    <td class="mono">${r.ts||''}</td>
+    <td>${r.order_id||''}</td>
+    <td>${r.decision||''}</td>
+    <td>${r.source||''}</td>
+    <td class="mono">${r.confidence!=null?Number(r.confidence).toFixed(2):''}</td>
+    <td class="mono">${r.rule_id||''}</td>
+    <td>${r.reason||''}</td>
+  </tr>`;
+}
+async function loadStats(){
+  const days=Number(daysEl.value)||14;
+  const r=await fetch(`/api/audit/stats?days=${days}`); const s=await r.json();
+  s_total.textContent=s.total??0; bars(s_decision,s.by_decision||{}); bars(s_source,s.by_source||{}); trend(s_trend,s.by_day||[]);
+}
+async function loadLatest(){
+  const r=await fetch('/api/audit/?page=1&page_size=50'); const j=await r.json();
+  tbody.innerHTML=(j.items||[]).map(row).join('')||'<tr><td colspan="8" class="ue-muted">No records</td></tr>';
+  expEl.href='/api/audit/export.csv';
+}
+daysEl.addEventListener('change', loadStats);
+window.addEventListener('DOMContentLoaded', ()=>{loadStats(); loadLatest();});
+</script>
+</body>
+</html>

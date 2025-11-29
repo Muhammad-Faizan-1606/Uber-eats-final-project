@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Admin • Agentic Complaint AI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="ue-header">
+  <div class="ue-brand"><span class="ue-uber">Uber</span><span class="ue-eats">Eats</span>-style Admin</div>
+  <nav class="ue-nav">
+    <a href="/">Decider</a>
+    <a href="/audit">Audit</a>
+    <a href="/admin" class="active">Admin</a>
+  </nav>
+</header>
+
+<main class="ue-container">
+  <section class="ue-card">
+    <div class="topbar">
+      <h1 class="ue-title" style="margin:0">Admin Dashboard</h1>
+      <form method="post" action="/admin/logout"><button class="ue-btn ue-btn-danger">Log out</button></form>
+    </div>
+    <p class="ue-subtitle">Secure summaries, charts and latest decisions.</p>
+    <iframe src="/audit" style="width:100%; height:72vh; border:0; border-radius:12px; background:#0f0f0f;"></iframe>
+  </section>
+</main>
+
+<footer class="ue-footer"><div>© Agentic Complaint AI</div></footer>
+</body>
+</html>

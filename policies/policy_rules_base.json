@@ -1,0 +1,43 @@
+{
+  "version": "1.0",
+  "rules": [
+    {
+      "id": "R-MISS-NOPHOTO",
+      "if": {
+        "order_status": "missing_delivery",
+        "handoff_photo": false
+      },
+      "then": {
+        "decision": "escalate",
+        "reason": "No proof of handoff on missing delivery",
+        "category": "missing_delivery"
+      },
+      "confidence": 0.85
+    },
+    {
+      "id": "R-DAMAGED-PHOTO",
+      "if": {
+        "order_status": "damaged_item",
+        "handoff_photo": true
+      },
+      "then": {
+        "decision": "refund",
+        "reason": "Photo exists but item reported damaged; refund",
+        "category": "quality_issue"
+      },
+      "confidence": 0.8
+    },
+    {
+      "id": "R-HIGH-REFUNDS",
+      "if": {
+        "refund_history_30d": ">=3"
+      },
+      "then": {
+        "decision": "deny",
+        "reason": "High refund frequency in last 30d",
+        "category": "abuse_risk"
+      },
+      "confidence": 0.9
+    }
+  ]
+}
