@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Admin{% endblock %} - Uber Eats</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .admin-layout { display: flex; min-height: 100vh; }
+        .sidebar { width: 260px; background: var(--bg-secondary); border-right: 1px solid var(--border); padding: 24px 0; position: fixed; height: 100vh; overflow-y: auto; }
+        .sidebar-logo { padding: 0 24px 24px; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
+        .sidebar-nav { display: flex; flex-direction: column; gap: 4px; padding: 0 12px; height: calc(100vh - 120px); }
+        .sidebar-link { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius); color: var(--text-secondary); font-size: 14px; font-weight: 500; transition: all 0.2s; }
+        .sidebar-link:hover, .sidebar-link.active { background: var(--bg-elevated); color: var(--text); }
+        .sidebar-link.active { background: var(--accent-soft); color: var(--accent); }
+        .sidebar-link svg { width: 20px; height: 20px; flex-shrink: 0; }
+        .sidebar-spacer { flex: 1; }
+        .main-content { flex: 1; margin-left: 260px; padding: 32px; }
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; flex-wrap: wrap; gap: 16px; }
+        .page-title { font-size: 28px; font-weight: 800; }
+        .page-actions { display: flex; gap: 12px; align-items: center; }
+        .user-info { display: flex; align-items: center; gap: 12px; }
+        .user-avatar { width: 40px; height: 40px; background: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #000; }
+        
+        /* Stats */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 32px; }
+        .stat-card { background: var(--bg-card); border-radius: var(--radius-lg); padding: 24px; }
+        .stat-label { font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
+        .stat-value { font-size: 32px; font-weight: 800; }
+        .stat-change { font-size: 13px; margin-top: 8px; }
+        .stat-change.up { color: var(--accent); }
+        .stat-change.down { color: var(--danger); }
+        
+        /* Charts */
+        .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; margin-bottom: 32px; }
+        .chart-card { background: var(--bg-card); border-radius: var(--radius-lg); padding: 24px; }
+        .chart-card h3 { font-size: 16px; font-weight: 600; margin-bottom: 20px; }
+        .chart-container { position: relative; height: 280px; }
+        
+        /* Tables */
+        .data-card { background: var(--bg-card); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 24px; }
+        .data-card-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid var(--border); }
+        .data-card-header h3 { font-size: 16px; font-weight: 600; margin: 0; }
+        .table { width: 100%; border-collapse: collapse; }
+        .table th, .table td { padding: 14px 24px; text-align: left; border-bottom: 1px solid var(--border); }
+        .table th { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; background: var(--bg-secondary); }
+        .table td { font-size: 14px; }
+        .table tr:last-child td { border-bottom: none; }
+        .table tr:hover td { background: var(--bg-secondary); }
+        .table-empty { text-align: center; color: var(--text-muted); padding: 60px 24px; }
+        
+        /* Badges */
+        .badge { display: inline-block; padding: 4px 10px; border-radius: var(--radius-full); font-size: 12px; font-weight: 600; }
+        .badge-refund { background: rgba(34,197,94,0.15); color: #86efac; }
+        .badge-deny { background: rgba(239,68,68,0.15); color: #fca5a5; }
+        .badge-escalate { background: rgba(245,158,11,0.15); color: #fde047; }
+        .badge-critical { background: #dc2626; color: white; }
+        .badge-high { background: #ea580c; color: white; }
+        .badge-medium { background: #ca8a04; color: white; }
+        .badge-low { background: #16a34a; color: white; }
+        .badge-fraud { background: rgba(239,68,68,0.2); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
+        .badge-outline { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); }
+        
+        /* SLA */
+        .sla-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--radius-full); font-size: 12px; font-weight: 600; }
+        .sla-overdue { background: rgba(239,68,68,0.2); color: #fca5a5; animation: pulse 2s infinite; }
+        .sla-urgent { background: rgba(245,158,11,0.2); color: #fde047; }
+        .sla-ok { background: rgba(34,197,94,0.15); color: #86efac; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        
+        /* Filters */
+        .filters-bar { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+        .filter-group { display: flex; flex-direction: column; gap: 4px; }
+        .filter-group label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; }
+        .filter-group select, .filter-group input { padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 13px; min-width: 150px; }
+        .filter-group select:focus, .filter-group input:focus { outline: none; border-color: var(--accent); }
+        
+        /* Buttons */
+        .btn-icon { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; }
+        .btn-icon:hover { background: var(--bg-elevated); color: var(--text); border-color: var(--text-muted); }
+        .btn-group { display: inline-flex; }
+        .btn-group .btn-icon { border-radius: 0; margin-left: -1px; }
+        .btn-group .btn-icon:first-child { border-radius: var(--radius) 0 0 var(--radius); margin-left: 0; }
+        .btn-group .btn-icon:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
+        .btn-group .btn-icon.active { background: var(--accent); color: #000; border-color: var(--accent); }
+        
+        /* Feedback buttons */
+        .feedback-btns { display: flex; gap: 8px; }
+        .feedback-btn { padding: 6px 12px; border-radius: var(--radius); font-size: 12px; font-weight: 600; border: 1px solid var(--border); background: transparent; color: var(--text-secondary); cursor: pointer; transition: all 0.2s; }
+        .feedback-btn:hover { background: var(--bg-secondary); }
+        .feedback-btn.correct { border-color: var(--accent); color: var(--accent); }
+        .feedback-btn.correct:hover { background: var(--accent-soft); }
+        .feedback-btn.wrong { border-color: var(--danger); color: #fca5a5; }
+        .feedback-btn.wrong:hover { background: rgba(239,68,68,0.1); }
+        
+        /* Modal */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 1000; opacity: 0; visibility: hidden; transition: all 0.3s; }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+        .modal { width: 100%; max-width: 600px; max-height: 90vh; background: var(--bg-card); border-radius: var(--radius-lg); overflow: hidden; transform: scale(0.95); transition: all 0.3s; }
+        .modal-overlay.active .modal { transform: scale(1); }
+        .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid var(--border); }
+        .modal-title { font-size: 18px; font-weight: 700; }
+        .modal-close { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: var(--bg-secondary); border: none; border-radius: var(--radius-full); color: var(--text); font-size: 20px; cursor: pointer; }
+        .modal-body { padding: 24px; max-height: calc(90vh - 140px); overflow-y: auto; }
+        .modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 12px; }
+        
+        /* Form */
+        .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group.full { grid-column: span 2; }
+        .form-group label { font-size: 13px; font-weight: 500; color: var(--text-secondary); }
+        .form-group input, .form-group select, .form-group textarea { padding: 12px 14px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 14px; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--accent); }
+        
+        /* Pagination */
+        .pagination { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 24px; }
+        .pagination button { padding: 8px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 13px; cursor: pointer; }
+        .pagination button:hover { background: var(--bg-secondary); }
+        .pagination button.active { background: var(--accent); color: #000; border-color: var(--accent); }
+        .pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        /* Evidence */
+        .evidence-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; margin-top: 16px; }
+        .evidence-item { aspect-ratio: 1; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); cursor: pointer; transition: all 0.2s; }
+        .evidence-item:hover { border-color: var(--accent); transform: scale(1.02); }
+        .evidence-item img { width: 100%; height: 100%; object-fit: cover; }
+        
+        /* Customer card */
+        .customer-card { background: var(--bg-card); border-radius: var(--radius-lg); padding: 24px; margin-bottom: 24px; }
+        .customer-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+        .customer-id { font-family: monospace; font-size: 18px; font-weight: 700; }
+        .customer-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+        .customer-stat { text-align: center; padding: 16px; background: var(--bg-secondary); border-radius: var(--radius); }
+        .customer-stat-value { font-size: 24px; font-weight: 800; }
+        .customer-stat-label { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+        
+        /* Toast */
+        .toast { position: fixed; bottom: 24px; right: 24px; padding: 16px 24px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); z-index: 1001; transform: translateY(100px); opacity: 0; transition: all 0.3s; }
+        .toast.show { transform: translateY(0); opacity: 1; }
+        .toast.success { border-color: var(--accent); }
+        .toast.error { border-color: var(--danger); }
+        
+        /* Upload zone */
+        .upload-zone { border: 2px dashed var(--border); border-radius: var(--radius-lg); padding: 48px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .upload-zone:hover { border-color: var(--accent); background: var(--accent-soft); }
+        .upload-zone.dragover { border-color: var(--accent); background: var(--accent-soft); }
+        .upload-zone svg { width: 48px; height: 48px; color: var(--text-muted); margin-bottom: 16px; }
+        .upload-zone p { color: var(--text-secondary); margin-bottom: 8px; }
+        .upload-zone small { color: var(--text-muted); font-size: 12px; }
+        
+        /* Progress */
+        .progress-bar { height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; background: var(--accent); transition: width 0.3s; }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="admin-layout">
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <a href="/" class="logo"><span class="logo-uber">Uber</span><span class="logo-eats">Eats</span></a>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/admin" class="sidebar-link {% if request.path == '/admin' %}active{% endif %}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                    Dashboard
+                </a>
+                <a href="/admin/complaints" class="sidebar-link {% if '/complaints' in request.path %}active{% endif %}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    Complaints
+                </a>
+                <a href="/admin/analytics" class="sidebar-link {% if '/analytics' in request.path %}active{% endif %}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                    Analytics
+                </a>
+                <a href="/admin/customers" class="sidebar-link {% if '/customers' in request.path %}active{% endif %}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    Customers
+                </a>
+                <a href="/admin/batch" class="sidebar-link {% if '/batch' in request.path %}active{% endif %}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                    Batch Upload
+                </a>
+                <a href="/admin/settings" class="sidebar-link {% if '/settings' in request.path %}active{% endif %}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    Settings
+                </a>
+                <div class="sidebar-spacer"></div>
+                <a href="/logout" class="sidebar-link" style="color:var(--danger)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    Logout
+                </a>
+            </nav>
+        </aside>
+        
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    
+    <div id="toast" class="toast"></div>
+    
+    <script>
+    function showToast(message, type = 'success') {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.className = 'toast ' + type + ' show';
+        setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+    
+    function formatDate(dateStr) {
+        if (!dateStr) return '-';
+        const d = new Date(dateStr);
+        return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    }
+    
+    function getSlaStatus(deadline) {
+        if (!deadline) return { class: 'sla-ok', text: '-' };
+        const now = new Date();
+        const sla = new Date(deadline);
+        const diff = sla - now;
+        const mins = Math.floor(diff / 60000);
+        
+        if (mins < 0) return { class: 'sla-overdue', text: 'OVERDUE' };
+        if (mins < 30) return { class: 'sla-urgent', text: mins + 'm left' };
+        if (mins < 60) return { class: 'sla-urgent', text: mins + 'm left' };
+        const hours = Math.floor(mins / 60);
+        return { class: 'sla-ok', text: hours + 'h left' };
+    }
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

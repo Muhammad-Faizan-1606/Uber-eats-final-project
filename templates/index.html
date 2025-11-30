@@ -1,116 +1,618 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="en">
 
-{% block content %}
-<section class="ue-hero">
-    <div class="ue-hero-left">
-        <h1>Your Uber Eats complaints, handled like a support pro.</h1>
-        <p class="ue-hero-sub">
-            Paste your order issue, and our AI filters & classifies it instantly so support can act faster.
-        </p>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Uber Eats - Food Delivery & Support (v2)</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+</head>
 
-        <form class="ue-search-form" method="POST" action="javascript:void(0);">
-            <textarea
-                id="hero-complaint-input"
-                class="ue-textarea"
-                placeholder="Describe your issue… e.g. 'Rider delivered the food 50 minutes late and one burger was missing.'"
-            ></textarea>
-            <button type="button" class="ue-btn-primary" id="hero-send-to-agent">
-                Classify with AI Agent
-            </button>
-        </form>
-
-        <div class="ue-hero-tags">
-            <span>Late Delivery</span>
-            <span>Missing Items</span>
-            <span>Cold Food</span>
-            <span>Wrong Order</span>
-        </div>
-    </div>
-
-    <div class="ue-hero-right">
-        <div class="ue-card ue-card-metric">
-            <h3>Smart Complaint Filter</h3>
-            <p>Automatically tags issues like delivery delay, food quality, missing items and refund requests.</p>
-            <ul>
-                <li>⚡ Faster triage</li>
-                <li>📂 Clean categories</li>
-                <li>🧠 Model-powered decisions</li>
-            </ul>
-        </div>
-
-        <div class="ue-card ue-card-orders">
-            <h3>Recent Orders</h3>
-            <div class="ue-order">
-                <div>
-                    <div class="ue-order-title">McDonald's – Combo Meal</div>
-                    <div class="ue-order-meta">Delivered • 32 min</div>
-                </div>
-                <button class="ue-order-btn">Complain</button>
-            </div>
-            <div class="ue-order">
-                <div>
-                    <div class="ue-order-title">Domino’s – Large Pizza</div>
-                    <div class="ue-order-meta">Delivered • 48 min</div>
-                </div>
-                <button class="ue-order-btn">Complain</button>
-            </div>
-            <div class="ue-order">
-                <div>
-                    <div class="ue-order-title">KFC – Zinger Duo</div>
-                    <div class="ue-order-meta">Delivered • 41 min</div>
-                </div>
-                <button class="ue-order-btn">Complain</button>
+<body>
+    <!-- Navigation -->
+    <header class="navbar">
+        <div class="navbar-inner">
+            <a href="/" class="logo"><span class="logo-uber">Uber</span><span class="logo-eats">Eats</span></a>
+            <nav class="nav-links">
+                <a href="/" class="nav-link active">Home</a>
+                <a href="#orders" class="nav-link">Orders</a>
+                <a href="#help" class="nav-link">Help</a>
+            </nav>
+            <div class="navbar-right">
+                <a href="/login" class="btn-signin">Admin Login</a>
             </div>
         </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero">
+        <div class="hero-content">
+            <div class="hero-text">
+                <h1>Order food to<br>your door</h1>
+                <p>Get your favorite meals delivered fast. Need help with an order? Our AI support is here 24/7.</p>
+                <div class="hero-buttons">
+                    <button class="btn-primary btn-lg" onclick="openComplaintModal()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        Get Support
+                    </button>
+                    <button class="btn-secondary btn-lg">Browse Restaurants</button>
+                </div>
+            </div>
+            <div class="hero-image">
+                <img src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&h=450&fit=crop" alt="Food">
+            </div>
+        </div>
+    </section>
+
+    <!-- Categories -->
+    <section class="section categories-section">
+        <div class="container">
+            <h2 class="section-title">Popular Categories</h2>
+            <div class="categories-grid">
+                <div class="category-card">
+                    <div class="category-img"><img
+                            src="https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=150&h=150&fit=crop"
+                            alt="Burgers"></div><span>Burgers</span>
+                </div>
+                <div class="category-card">
+                    <div class="category-img"><img
+                            src="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=150&h=150&fit=crop"
+                            alt="Pizza"></div><span>Pizza</span>
+                </div>
+                <div class="category-card">
+                    <div class="category-img"><img
+                            src="https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?w=150&h=150&fit=crop"
+                            alt="Chicken"></div><span>Chicken</span>
+                </div>
+                <div class="category-card">
+                    <div class="category-img"><img
+                            src="https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=150&h=150&fit=crop"
+                            alt="Sushi"></div><span>Sushi</span>
+                </div>
+                <div class="category-card">
+                    <div class="category-img"><img
+                            src="https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=150&h=150&fit=crop"
+                            alt="Healthy"></div><span>Healthy</span>
+                </div>
+                <div class="category-card">
+                    <div class="category-img"><img
+                            src="https://images.unsplash.com/photo-1551024601-bec78aea704b?w=150&h=150&fit=crop"
+                            alt="Desserts"></div><span>Desserts</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Orders -->
+    <section class="section orders-section" id="orders">
+        <div class="container">
+            <h2 class="section-title">Your Recent Orders</h2>
+            <div class="orders-grid">
+                {% for order in orders %}
+                <div class="order-card">
+                    <div class="order-img">
+                        {% if 'McDonald' in order.restaurant %}<img
+                            src="https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300&h=180&fit=crop"
+                            alt="{{ order.restaurant }}">
+                        {% elif 'Domino' in order.restaurant %}<img
+                            src="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=300&h=180&fit=crop"
+                            alt="{{ order.restaurant }}">
+                        {% elif 'KFC' in order.restaurant %}<img
+                            src="https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?w=300&h=180&fit=crop"
+                            alt="{{ order.restaurant }}">
+                        {% else %}<img
+                            src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=300&h=180&fit=crop"
+                            alt="{{ order.restaurant }}">{% endif %}
+                    </div>
+                    <div class="order-details">
+                        <div class="order-restaurant">{{ order.restaurant }}</div>
+                        <div class="order-item">{{ order.title }}</div>
+                        <div class="order-meta">
+                            <span class="order-badge">{{ order.status }}</span>
+                            <span class="order-time">{{ order.time_ago }} ago</span>
+                        </div>
+                        <div class="order-actions">
+                            <button class="btn-sm btn-outline">Reorder</button>
+                            <button class="btn-sm btn-primary"
+                                onclick="openComplaintModal('{{ order.id }}', '{{ order.restaurant }}')">Get
+                                Help</button>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <!-- Help Section -->
+    <section class="section help-section" id="help">
+        <div class="container">
+            <div class="help-content">
+                <div class="help-text">
+                    <span class="help-badge">AI-Powered Support</span>
+                    <h2>Need Help With Your Order?</h2>
+                    <p>Our intelligent complaint system can instantly classify your issue, detect severity, and provide
+                        quick resolutions. Get refunds processed in minutes, not days.</p>
+                    <div class="features-list">
+                        <div class="feature-item"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                stroke="#22c55e" stroke-width="2">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                <polyline points="22 4 12 14.01 9 11.01" />
+                            </svg><span>Instant AI Classification</span></div>
+                        <div class="feature-item"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                stroke="#22c55e" stroke-width="2">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                <polyline points="22 4 12 14.01 9 11.01" />
+                            </svg><span>Fraud Detection & SLA Tracking</span></div>
+                        <div class="feature-item"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                stroke="#22c55e" stroke-width="2">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                <polyline points="22 4 12 14.01 9 11.01" />
+                            </svg><span>Email Notifications</span></div>
+                    </div>
+                    <button class="btn-primary btn-lg" onclick="openComplaintModal()">Open Complaint Assistant</button>
+                </div>
+                <div class="help-image">
+                    <img src="https://images.unsplash.com/photo-1556745757-8d76bdb6984b?w=500&h=400&fit=crop"
+                        alt="Support">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Issue Cards -->
+    <section class="section issues-section">
+        <div class="container">
+            <h2 class="section-title">Common Issues We Handle</h2>
+            <div class="issues-grid">
+                <div class="issue-card" onclick="openComplaintModal(null, null, 'late_delivery')">
+                    <div class="issue-icon" style="background:rgba(239,68,68,0.1)"><svg width="28" height="28"
+                            viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                        </svg></div>
+                    <h3>Late Delivery</h3>
+                    <p>Order arrived later than estimated</p>
+                </div>
+                <div class="issue-card" onclick="openComplaintModal(null, null, 'missing_delivery')">
+                    <div class="issue-icon" style="background:rgba(245,158,11,0.1)"><svg width="28" height="28"
+                            viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2">
+                            <path
+                                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                        </svg></div>
+                    <h3>Missing Items</h3>
+                    <p>Items not delivered</p>
+                </div>
+                <div class="issue-card" onclick="openComplaintModal(null, null, 'wrong_item')">
+                    <div class="issue-icon" style="background:rgba(139,92,246,0.1)"><svg width="28" height="28"
+                            viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2">
+                            <path
+                                d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                        </svg></div>
+                    <h3>Wrong Order</h3>
+                    <p>Received incorrect items</p>
+                </div>
+                <div class="issue-card" onclick="openComplaintModal(null, null, 'damaged_item')">
+                    <div class="issue-icon" style="background:rgba(59,130,246,0.1)"><svg width="28" height="28"
+                            viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2">
+                            <path
+                                d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+                        </svg></div>
+                    <h3>Quality Issues</h3>
+                    <p>Food damaged or cold</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-col">
+                    <div class="footer-logo"><span class="logo-uber">Uber</span><span class="logo-eats">Eats</span>
+                    </div>
+                    <p>AI-powered complaint resolution for food delivery.</p>
+                </div>
+                <div class="footer-col">
+                    <h4>Product</h4>
+                    <ul>
+                        <li><a href="/">Home</a></li>
+                        <li><a href="#orders">Orders</a></li>
+                        <li><a href="#help">Help</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <h4>Admin</h4>
+                    <ul>
+                        <li><a href="/login">Dashboard</a></li>
+                        <li><a href="/login">Analytics</a></li>
+                        <li><a href="/login">Settings</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>© 2025 Uber Eats Complaint AI. Demo Project.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Complaint Modal -->
+    <div class="modal-overlay" id="complaint-modal">
+        <div class="modal" style="max-width:700px">
+            <div class="modal-header">
+                <div class="modal-title"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    </svg>Complaint Assistant</div>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="complaint-form" class="complaint-form">
+                    <div class="form-section">
+                        <h3>📋 Order Information</h3>
+                        <div class="form-row">
+                            <div class="form-group"><label>Order ID <span class="req">*</span></label><input type="text"
+                                    id="order_id" required placeholder="e.g., UE-10021"></div>
+                            <div class="form-group"><label>Your Email</label><input type="email" id="email"
+                                    placeholder="For notifications"></div>
+                        </div>
+                    </div>
+                    <div class="form-section">
+                        <h3>🔍 Issue Details</h3>
+                        <div class="form-row">
+                            <div class="form-group"><label>Issue Type <span class="req">*</span></label>
+                                <select id="issue_type" required>
+                                    <option value="">Select issue...</option>
+                                    <option value="late_delivery">🕐 Late Delivery</option>
+                                    <option value="missing_delivery">📦 Missing / Never Arrived</option>
+                                    <option value="wrong_item">❌ Wrong Order</option>
+                                    <option value="damaged_item">💔 Quality Issue</option>
+                                    <option value="driver_issue">🚗 Driver Problem</option>
+                                    <option value="overcharge">💰 Overcharged</option>
+                                </select>
+                            </div>
+                            <div class="form-group"><label>Delivery Photo?</label>
+                                <select id="handoff_photo">
+                                    <option value="true">✅ Yes</option>
+                                    <option value="false">❌ No</option>
+                                    <option value="unknown">🤷 Unknown</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Refunds This Month</label>
+                                <select id="refund_history">
+                                    <option value="0">0 - First time</option>
+                                    <option value="1">1</option>
+                                    <option value="2">2</option>
+                                    <option value="3">3+</option>
+                                </select>
+                            </div>
+                            <div class="form-group"><label>Delivery Rating</label>
+                                <select id="courier_rating">
+                                    <option value="5">⭐⭐⭐⭐⭐ (5)</option>
+                                    <option value="4" selected>⭐⭐⭐⭐ (4)</option>
+                                    <option value="3">⭐⭐⭐ (3)</option>
+                                    <option value="2">⭐⭐ (2)</option>
+                                    <option value="1">⭐ (1)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-section">
+                        <h3>📝 Description</h3>
+                        <div class="form-group">
+                            <label>Describe your issue</label>
+                            <div style="position:relative">
+                                <textarea id="complaint_text" rows="4"
+                                    placeholder="Please provide details about what happened..."></textarea>
+                                <button type="button" class="rewrite-btn" onclick="rewriteComplaint()"
+                                    title="AI Rewrite">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                    </svg>
+                                    Improve Text
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Upload Evidence (photos, screenshots)</label>
+                            <div class="evidence-upload" id="evidence-zone">
+                                <input type="file" id="evidence" accept="image/*,.pdf" multiple style="display:none"
+                                    onchange="handleFileUpload(event)">
+                                <div class="upload-placeholder" onclick="document.getElementById('evidence').click()">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                        <polyline points="17 8 12 3 7 8" />
+                                        <line x1="12" y1="3" x2="12" y2="15" />
+                                    </svg>
+                                    <span>Click to upload or drag files here</span>
+                                </div>
+                                <div class="evidence-preview" id="evidence-preview"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" onclick="closeModal()">Cancel</button>
+                        <button type="submit" class="btn-primary" id="submit-btn"><svg width="18" height="18"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="22" y1="2" x2="11" y2="13" />
+                                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                            </svg>Submit</button>
+                    </div>
+                </form>
+                <div id="result-view" class="result-view" style="display:none"></div>
+            </div>
+        </div>
     </div>
-</section>
 
-<section class="ue-grid">
-    <div class="ue-grid-title-row">
-        <h2>Common complaint categories</h2>
-        <span class="ue-grid-sub">Optimised for Uber Eats–style orders</span>
-    </div>
+    <!-- FAB -->
+    <button class="fab" onclick="openComplaintModal()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        </svg>
+    </button>
 
-    <div class="ue-grid-cards">
-        <div class="ue-card ue-card-small">
-            <h3>Delivery Issues</h3>
-            <p>Late rider, address problems, wrong handover, unreachable rider.</p>
-        </div>
-        <div class="ue-card ue-card-small">
-            <h3>Food Quality</h3>
-            <p>Cold food, stale fries, soggy items, poor packaging, leaking drinks.</p>
-        </div>
-        <div class="ue-card ue-card-small">
-            <h3>Missing / Wrong Items</h3>
-            <p>Forgotten add-ons, missing drinks, swapped items, wrong size.</p>
-        </div>
-        <div class="ue-card ue-card-small">
-            <h3>Payment & Refunds</h3>
-            <p>Double charge, failed refunds, promo code issues, tips or fees disputes.</p>
-        </div>
-    </div>
-</section>
+    <style>
+        .rewrite-btn {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
 
-<script>
-    // Send the hero complaint text directly into the agent
-    const heroButton = document.getElementById("hero-send-to-agent");
-    const heroInput = document.getElementById("hero-complaint-input");
-    const agentFab = document.getElementById("agent-fab");
-    const agentWidget = document.getElementById("agent-widget");
-    const agentInput = document.getElementById("agent-input");
+        .rewrite-btn:hover {
+            background: var(--accent-soft);
+            color: var(--accent);
+            border-color: var(--accent);
+        }
 
-    heroButton.addEventListener("click", () => {
-        const text = heroInput.value.trim();
-        if (!text) return;
+        .evidence-upload {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            transition: all 0.2s;
+        }
 
-        // Open widget
-        agentWidget.classList.add("agent-open");
-        agentFab.classList.add("agent-hidden");
+        .evidence-upload:hover {
+            border-color: var(--accent);
+        }
 
-        // Push text into agent input and trigger Enter
-        agentInput.value = text;
-        const submitEvent = new Event("submit");
-        document.getElementById("agent-form").dispatchEvent(submitEvent);
-    });
-</script>
-{% endblock %}
+        .upload-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            color: var(--text-muted);
+        }
+
+        .evidence-preview {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .evidence-preview:empty {
+            display: none;
+        }
+
+        .evidence-item {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .evidence-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .evidence-item .remove-btn {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 20px;
+            height: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+
+    <script>
+        let uploadedFiles = [];
+
+        function openComplaintModal(orderId = null, restaurant = null, issueType = null) {
+            document.getElementById('complaint-modal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+            document.getElementById('complaint-form').style.display = 'block';
+            document.getElementById('result-view').style.display = 'none';
+            if (orderId) document.getElementById('order_id').value = orderId;
+            if (issueType) document.getElementById('issue_type').value = issueType;
+            if (restaurant) document.getElementById('complaint_text').value = `Issue with order from ${restaurant}: `;
+        }
+
+        function closeModal() {
+            document.getElementById('complaint-modal').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        document.getElementById('complaint-modal').onclick = e => { if (e.target.id === 'complaint-modal') closeModal(); };
+        document.onkeydown = e => { if (e.key === 'Escape') closeModal(); };
+
+        async function rewriteComplaint() {
+            const text = document.getElementById('complaint_text').value;
+            if (!text.trim()) return;
+
+            const btn = document.querySelector('.rewrite-btn');
+            btn.innerHTML = '<span class="spinner" style="width:14px;height:14px"></span>';
+
+            try {
+                const res = await fetch('/api/rewrite', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text })
+                });
+                const data = await res.json();
+                if (data.rewritten) {
+                    document.getElementById('complaint_text').value = data.rewritten;
+                }
+            } catch (e) {
+                console.error(e);
+            }
+
+            btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Improve Text';
+        }
+
+        function handleFileUpload(e) {
+            const files = Array.from(e.target.files);
+            const preview = document.getElementById('evidence-preview');
+
+            files.forEach(file => {
+                if (!file.type.startsWith('image/') && file.type !== 'application/pdf') return;
+
+                uploadedFiles.push(file);
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const div = document.createElement('div');
+                    div.className = 'evidence-item';
+                    div.innerHTML = `
+                    <img src="${file.type.startsWith('image/') ? e.target.result : 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%236b7280"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>'}" alt="${file.name}">
+                    <button class="remove-btn" onclick="removeEvidence(this, ${uploadedFiles.length - 1})">&times;</button>
+                `;
+                    preview.appendChild(div);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function removeEvidence(btn, index) {
+            uploadedFiles.splice(index, 1);
+            btn.parentElement.remove();
+        }
+
+        document.getElementById('complaint-form').onsubmit = async function (e) {
+            e.preventDefault();
+            const btn = document.getElementById('submit-btn');
+            btn.innerHTML = '<span class="spinner"></span> Processing...';
+            btn.disabled = true;
+
+            try {
+                // Upload evidence files first
+                const evidenceUrls = [];
+                for (const file of uploadedFiles) {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('complaint_id', 'temp');
+                    const uploadRes = await fetch('/api/upload/evidence', { method: 'POST', body: formData });
+                    if (uploadRes.ok) {
+                        const uploadData = await uploadRes.json();
+                        evidenceUrls.push(uploadData.url);
+                    }
+                }
+
+                const data = {
+                    order_id: document.getElementById('order_id').value,
+                    email: document.getElementById('email').value,
+                    issue_type: document.getElementById('issue_type').value,
+                    handoff_photo: document.getElementById('handoff_photo').value,
+                    refund_history_30d: parseInt(document.getElementById('refund_history').value),
+                    courier_rating: parseFloat(document.getElementById('courier_rating').value),
+                    complaint_text: document.getElementById('complaint_text').value,
+                    evidence_files: evidenceUrls
+                };
+
+                const res = await fetch('/api/classify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+                const result = await res.json();
+
+                if (result.error || !result.decision) {
+                    throw new Error(result.error || 'Server returned an invalid response. Please check your connection or try again later.');
+                }
+
+                const decisionColors = { refund: { bg: '#dcfce7', border: '#22c55e', text: '#166534', icon: '✅' }, deny: { bg: '#fee2e2', border: '#ef4444', text: '#991b1b', icon: '❌' }, escalate: { bg: '#fef3c7', border: '#f59e0b', text: '#92400e', icon: '⏳' } };
+                const style = decisionColors[result.decision] || decisionColors.escalate;
+                const severityColors = { critical: '#dc2626', high: '#ea580c', medium: '#ca8a04', low: '#16a34a' };
+                const slaDeadline = result.sla_deadline ? new Date(result.sla_deadline) : null;
+                const slaText = slaDeadline ? `Due: ${slaDeadline.toLocaleString()}` : '';
+
+                document.getElementById('result-view').innerHTML = `
+                <div class="result-card" style="background:${style.bg};border:2px solid ${style.border};border-radius:16px;padding:32px;text-align:center;margin-bottom:24px">
+                    <div style="font-size:48px;margin-bottom:12px">${style.icon}</div>
+                    <div style="font-size:12px;color:${style.text};text-transform:uppercase;letter-spacing:1px">Decision</div>
+                    <div style="font-size:32px;font-weight:800;color:${style.text}">${result.decision.toUpperCase()}</div>
+                    <div style="font-size:14px;color:${style.text};margin-top:4px">${(result.confidence * 100).toFixed(0)}% confidence</div>
+                </div>
+                <div class="result-details" style="background:#1a1a1a;border-radius:12px;padding:20px">
+                    <div class="detail-row"><span>Order ID</span><strong>${result.order_id}</strong></div>
+                    <div class="detail-row"><span>Complaint ID</span><strong>${result.complaint_id}</strong></div>
+                    <div class="detail-row"><span>Severity</span><span style="background:${severityColors[result.severity] || severityColors.medium};color:white;padding:4px 12px;border-radius:12px;font-size:12px;font-weight:600">${(result.severity || 'medium').toUpperCase()}</span></div>
+                    <div class="detail-row"><span>SLA</span><strong>${slaText || 'N/A'}</strong></div>
+                    <div class="detail-row"><span>Categories</span><strong>${(result.categories || []).join(', ')}</strong></div>
+                    <div class="detail-row"><span>Fraud Risk</span><strong style="color:${result.fraud_risk === 'high' || result.fraud_risk === 'critical' ? '#fca5a5' : 'inherit'}">${result.fraud_risk || 'low'}</strong></div>
+                    <div class="detail-row"><span>Source</span><strong>${result.source}</strong></div>
+                    <div class="detail-row" style="flex-direction:column;align-items:flex-start;gap:8px"><span>Explanation</span><p style="margin:0;color:#9ca3af">${result.explanation || ''}</p></div>
+                    ${result.email_sent ? '<div class="detail-row"><span>Email</span><strong style="color:#22c55e">✓ Sent</strong></div>' : ''}
+                    ${evidenceUrls.length ? `<div class="detail-row"><span>Evidence</span><strong>${evidenceUrls.length} file(s) uploaded</strong></div>` : ''}
+                </div>
+                <div style="display:flex;gap:12px;margin-top:24px">
+                    <button class="btn-secondary" style="flex:1" onclick="document.getElementById('complaint-form').reset();document.getElementById('complaint-form').style.display='block';document.getElementById('result-view').style.display='none';uploadedFiles=[];document.getElementById('evidence-preview').innerHTML='';">New Complaint</button>
+                    <button class="btn-primary" style="flex:1" onclick="closeModal()">Done</button>
+                </div>`;
+                document.getElementById('complaint-form').style.display = 'none';
+                document.getElementById('result-view').style.display = 'block';
+            } catch (err) {
+                // Show error in the modal instead of alert
+                document.getElementById('result-view').innerHTML = `
+                <div class="result-card" style="background:#fee2e2;border:2px solid #ef4444;border-radius:16px;padding:32px;text-align:center;margin-bottom:24px">
+                    <div style="font-size:48px;margin-bottom:12px">⚠️</div>
+                    <div style="font-size:12px;color:#991b1b;text-transform:uppercase;letter-spacing:1px">Error</div>
+                    <div style="font-size:24px;font-weight:800;color:#991b1b">Request Failed</div>
+                    <p style="color:#991b1b;margin-top:12px">${err.message}</p>
+                </div>
+                <div style="text-align:center">
+                    <button class="btn-primary" onclick="document.getElementById('complaint-form').style.display='block';document.getElementById('result-view').style.display='none';">Try Again</button>
+                </div>`;
+                document.getElementById('complaint-form').style.display = 'none';
+                document.getElementById('result-view').style.display = 'block';
+            } finally {
+                btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Submit';
+                btn.disabled = false;
+            }
+        };
+    </script>
+</body>
+
+</html>

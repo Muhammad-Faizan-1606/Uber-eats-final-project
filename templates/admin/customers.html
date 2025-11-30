@@ -1,0 +1,265 @@
+{% extends "admin/base.html" %}
+{% block title %}Customers{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Customer Management</h1>
+</div>
+
+<div class="filters-bar">
+    <div class="filter-group">
+        <label>Search Customer</label>
+        <input type="text" id="customer-search" placeholder="Customer ID or email..." onkeyup="debounceSearch()">
+    </div>
+    <div class="filter-group">
+        <label>Risk Tier</label>
+        <select id="filter-risk" onchange="loadCustomers()">
+            <option value="all">All Tiers</option>
+            <option value="flagged">Flagged</option>
+            <option value="watch">Watch</option>
+            <option value="normal">Normal</option>
+            <option value="trusted">Trusted</option>
+            <option value="vip">VIP</option>
+        </select>
+    </div>
+    <div class="filter-group">
+        <label>Sort By</label>
+        <select id="filter-sort" onchange="loadCustomers()">
+            <option value="complaints">Most Complaints</option>
+            <option value="recent">Most Recent</option>
+            <option value="refund_rate">Highest Refund Rate</option>
+        </select>
+    </div>
+</div>
+
+<!-- Customer Detail View (shows when customer selected) -->
+<div id="customer-detail" style="display:none">
+    <button class="btn-secondary" onclick="hideCustomerDetail()" style="margin-bottom:24px">← Back to List</button>
+    
+    <div class="customer-card" id="customer-card-detail"></div>
+    
+    <div class="data-card">
+        <div class="data-card-header">
+            <h3>Complaint History</h3>
+        </div>
+        <table class="table" id="customer-complaints-table">
+            <thead>
+                <tr>
+                    <th>Complaint ID</th>
+                    <th>Order</th>
+                    <th>Category</th>
+                    <th>Decision</th>
+                    <th>Severity</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody id="customer-complaints-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Customer List View -->
+<div id="customer-list">
+    <div class="data-card">
+        <div class="data-card-header">
+            <h3>Top Complainers (Last 30 Days)</h3>
+        </div>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Customer ID</th>
+                    <th>Complaints</th>
+                    <th>Refunds</th>
+                    <th>Refund Rate</th>
+                    <th>Fraud Flags</th>
+                    <th>Risk Tier</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="customers-body">
+                <tr><td colspan="7" class="table-empty">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let searchTimeout;
+let currentCustomer = null;
+
+async function loadCustomers() {
+    try {
+        const res = await fetch('/api/customers/top?days=30&limit=50');
+        const data = await res.json();
+        renderCustomers(data.customers || []);
+    } catch(e) {
+        document.getElementById('customers-body').innerHTML = '<tr><td colspan="7" class="table-empty">Error loading customers</td></tr>';
+    }
+}
+
+function renderCustomers(customers) {
+    const tbody = document.getElementById('customers-body');
+    
+    if (!customers.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="table-empty">No customers found</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = customers.map(c => {
+        const riskBadge = getRiskBadge(c.refund_rate, c.fraud_flags);
+        return `<tr>
+            <td style="font-family:monospace">${c.customer_id}</td>
+            <td><strong>${c.complaints}</strong></td>
+            <td>${c.refunds}</td>
+            <td>${Math.round(c.refund_rate * 100)}%</td>
+            <td>${c.fraud_flags > 0 ? '<span class="badge badge-fraud">⚠️ ' + c.fraud_flags + '</span>' : '-'}</td>
+            <td>${riskBadge}</td>
+            <td>
+                <button class="btn-icon" onclick="showCustomerDetail('${c.customer_id}')" title="View Details">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function getRiskBadge(refundRate, fraudFlags) {
+    if (fraudFlags >= 3 || refundRate > 0.5) return '<span class="badge badge-critical">Flagged</span>';
+    if (fraudFlags >= 1 || refundRate > 0.3) return '<span class="badge badge-high">Watch</span>';
+    if (refundRate < 0.1) return '<span class="badge badge-low">Trusted</span>';
+    return '<span class="badge badge-medium">Normal</span>';
+}
+
+async function showCustomerDetail(customerId) {
+    currentCustomer = customerId;
+    
+    document.getElementById('customer-list').style.display = 'none';
+    document.getElementById('customer-detail').style.display = 'block';
+    
+    try {
+        const res = await fetch(`/api/customer/${customerId}`);
+        const data = await res.json();
+        renderCustomerDetail(data);
+        
+        const complaintsRes = await fetch(`/api/customer/${customerId}/complaints?limit=50`);
+        const complaintsData = await complaintsRes.json();
+        renderCustomerComplaints(complaintsData.items || []);
+    } catch(e) {
+        console.error('Error loading customer:', e);
+    }
+}
+
+function renderCustomerDetail(data) {
+    const stats = data.stats || {};
+    const riskBadge = getRiskBadge(stats.refund_rate || 0, data.fraud_history?.high || 0);
+    
+    document.getElementById('customer-card-detail').innerHTML = `
+        <div class="customer-header">
+            <div>
+                <div class="customer-id">${data.customer_id}</div>
+                <div style="color:var(--text-muted);font-size:13px;margin-top:4px">
+                    First seen: ${data.stats?.first_complaint ? formatDate(data.stats.first_complaint) : 'N/A'}
+                </div>
+            </div>
+            <div>${riskBadge}</div>
+        </div>
+        <div class="customer-stats">
+            <div class="customer-stat">
+                <div class="customer-stat-value">${stats.total_complaints || 0}</div>
+                <div class="customer-stat-label">Total Complaints</div>
+            </div>
+            <div class="customer-stat">
+                <div class="customer-stat-value">${stats.refunds || 0}</div>
+                <div class="customer-stat-label">Refunds</div>
+            </div>
+            <div class="customer-stat">
+                <div class="customer-stat-value" style="color:${stats.refund_rate > 0.3 ? 'var(--danger)' : 'var(--text)'}">${Math.round((stats.refund_rate || 0) * 100)}%</div>
+                <div class="customer-stat-label">Refund Rate</div>
+            </div>
+            <div class="customer-stat">
+                <div class="customer-stat-value">${stats.escalations || 0}</div>
+                <div class="customer-stat-label">Escalations</div>
+            </div>
+        </div>
+        ${data.fraud_history && Object.keys(data.fraud_history).length ? `
+        <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">
+            <h4 style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Fraud History</h4>
+            <div style="display:flex;gap:12px;flex-wrap:wrap">
+                ${Object.entries(data.fraud_history).map(([level, count]) => `
+                    <span class="badge ${level === 'high' || level === 'critical' ? 'badge-fraud' : 'badge-outline'}">${level}: ${count}</span>
+                `).join('')}
+            </div>
+        </div>
+        ` : ''}
+        ${data.categories && Object.keys(data.categories).length ? `
+        <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">
+            <h4 style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Issue Categories</h4>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                ${Object.entries(data.categories).map(([cat, count]) => `
+                    <span class="badge badge-outline">${cat.replace(/[\[\]"]/g, '').replace(/_/g, ' ')}: ${count}</span>
+                `).join('')}
+            </div>
+        </div>
+        ` : ''}
+    `;
+}
+
+function renderCustomerComplaints(complaints) {
+    const tbody = document.getElementById('customer-complaints-body');
+    
+    if (!complaints.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="table-empty">No complaints found</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = complaints.map(c => {
+        const categories = c.categories ? (typeof c.categories === 'string' ? JSON.parse(c.categories) : c.categories) : [];
+        return `<tr>
+            <td style="font-family:monospace">${(c.complaint_id || '').substring(0,8)}...</td>
+            <td>${c.order_id || '-'}</td>
+            <td>${Array.isArray(categories) ? categories[0]?.replace(/_/g, ' ') : '-'}</td>
+            <td>${getDecisionBadge(c.decision)}</td>
+            <td>${getSeverityBadge(c.severity)}</td>
+            <td>${c.timestamp ? formatDate(c.timestamp) : '-'}</td>
+        </tr>`;
+    }).join('');
+}
+
+function hideCustomerDetail() {
+    document.getElementById('customer-detail').style.display = 'none';
+    document.getElementById('customer-list').style.display = 'block';
+    currentCustomer = null;
+}
+
+function getDecisionBadge(d) {
+    const b = {refund:'<span class="badge badge-refund">Refund</span>',deny:'<span class="badge badge-deny">Deny</span>',escalate:'<span class="badge badge-escalate">Escalate</span>'};
+    return b[d] || b.escalate;
+}
+
+function getSeverityBadge(s) {
+    const b = {critical:'<span class="badge badge-critical">Critical</span>',high:'<span class="badge badge-high">High</span>',medium:'<span class="badge badge-medium">Medium</span>',low:'<span class="badge badge-low">Low</span>'};
+    return b[s] || b.medium;
+}
+
+function debounceSearch() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        const query = document.getElementById('customer-search').value.trim();
+        if (query.length >= 3) {
+            showCustomerDetail(query);
+        }
+    }, 500);
+}
+
+// Check URL for customer ID
+const urlParams = new URLSearchParams(window.location.search);
+const customerId = urlParams.get('id');
+if (customerId) {
+    showCustomerDetail(customerId);
+} else {
+    loadCustomers();
+}
+</script>
+{% endblock %}

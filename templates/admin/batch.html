@@ -1,0 +1,257 @@
+{% extends "admin/base.html" %}
+{% block title %}Batch Upload{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Batch Upload</h1>
+</div>
+
+<div class="charts-grid">
+    <div class="chart-card">
+        <h3>Upload CSV File</h3>
+        <div class="upload-zone" id="upload-zone" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" onclick="document.getElementById('file-input').click()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <p>Drop your CSV file here or click to browse</p>
+            <small>Supports .csv files up to 10MB</small>
+        </div>
+        <input type="file" id="file-input" accept=".csv" style="display:none" onchange="handleFileSelect(event)">
+        
+        <div id="file-info" style="display:none;margin-top:20px;padding:16px;background:var(--bg-secondary);border-radius:var(--radius)">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <div>
+                    <div style="font-weight:600" id="file-name">file.csv</div>
+                    <div style="font-size:12px;color:var(--text-muted)" id="file-size">0 KB</div>
+                </div>
+                <button class="btn-secondary btn-sm" onclick="clearFile()">Remove</button>
+            </div>
+        </div>
+        
+        <button class="btn-primary btn-lg" style="width:100%;margin-top:20px" id="process-btn" onclick="processFile()" disabled>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Process File
+        </button>
+    </div>
+    
+    <div class="chart-card">
+        <h3>CSV Format Guide</h3>
+        <div style="font-size:14px;color:var(--text-secondary);line-height:1.8">
+            <p style="margin-bottom:16px">Your CSV file should include these columns:</p>
+            <table style="width:100%;font-size:13px">
+                <tr style="border-bottom:1px solid var(--border)">
+                    <td style="padding:8px 0;font-weight:600">order_id</td>
+                    <td style="padding:8px 0;color:var(--text-muted)">Required - Order identifier</td>
+                </tr>
+                <tr style="border-bottom:1px solid var(--border)">
+                    <td style="padding:8px 0;font-weight:600">issue_type</td>
+                    <td style="padding:8px 0;color:var(--text-muted)">late_delivery, missing_delivery, wrong_item, damaged_item</td>
+                </tr>
+                <tr style="border-bottom:1px solid var(--border)">
+                    <td style="padding:8px 0;font-weight:600">complaint_text</td>
+                    <td style="padding:8px 0;color:var(--text-muted)">Customer's complaint description</td>
+                </tr>
+                <tr style="border-bottom:1px solid var(--border)">
+                    <td style="padding:8px 0;font-weight:600">refund_history_30d</td>
+                    <td style="padding:8px 0;color:var(--text-muted)">Number of refunds in last 30 days</td>
+                </tr>
+                <tr style="border-bottom:1px solid var(--border)">
+                    <td style="padding:8px 0;font-weight:600">handoff_photo</td>
+                    <td style="padding:8px 0;color:var(--text-muted)">true/false - Was delivery photo taken?</td>
+                </tr>
+                <tr>
+                    <td style="padding:8px 0;font-weight:600">courier_rating</td>
+                    <td style="padding:8px 0;color:var(--text-muted)">1.0 - 5.0 courier rating</td>
+                </tr>
+            </table>
+            
+            <div style="margin-top:20px;padding:16px;background:var(--bg-secondary);border-radius:var(--radius)">
+                <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Example CSV:</div>
+                <code style="font-size:11px;display:block;white-space:pre-wrap;color:var(--accent)">order_id,issue_type,complaint_text,refund_history_30d,handoff_photo,courier_rating
+UE-001,late_delivery,"Food arrived 1 hour late",0,true,4.2
+UE-002,missing_delivery,"Never received order",1,false,3.8</code>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Results -->
+<div id="results-section" style="display:none">
+    <div class="data-card">
+        <div class="data-card-header">
+            <h3>Processing Results</h3>
+            <div style="display:flex;gap:12px;align-items:center">
+                <span id="results-summary" style="font-size:14px;color:var(--text-secondary)"></span>
+                <button class="btn-secondary btn-sm" onclick="downloadResults()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Download Results
+                </button>
+            </div>
+        </div>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Order ID</th>
+                    <th>Decision</th>
+                    <th>Confidence</th>
+                    <th>Severity</th>
+                    <th>Categories</th>
+                </tr>
+            </thead>
+            <tbody id="results-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Progress Modal -->
+<div class="modal-overlay" id="progress-modal">
+    <div class="modal" style="max-width:400px">
+        <div class="modal-body" style="text-align:center;padding:48px">
+            <div class="spinner" style="width:48px;height:48px;margin:0 auto 24px;border-width:4px"></div>
+            <h3 style="margin-bottom:8px">Processing...</h3>
+            <p style="color:var(--text-secondary)" id="progress-text">Uploading file...</p>
+            <div class="progress-bar" style="margin-top:24px">
+                <div class="progress-fill" id="progress-bar" style="width:0%"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let selectedFile = null;
+let results = [];
+
+function handleDragOver(e) {
+    e.preventDefault();
+    document.getElementById('upload-zone').classList.add('dragover');
+}
+
+function handleDragLeave(e) {
+    document.getElementById('upload-zone').classList.remove('dragover');
+}
+
+function handleDrop(e) {
+    e.preventDefault();
+    document.getElementById('upload-zone').classList.remove('dragover');
+    const files = e.dataTransfer.files;
+    if (files.length) handleFile(files[0]);
+}
+
+function handleFileSelect(e) {
+    if (e.target.files.length) handleFile(e.target.files[0]);
+}
+
+function handleFile(file) {
+    if (!file.name.endsWith('.csv')) {
+        showToast('Please select a CSV file', 'error');
+        return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+        showToast('File too large. Max 10MB', 'error');
+        return;
+    }
+    
+    selectedFile = file;
+    document.getElementById('file-name').textContent = file.name;
+    document.getElementById('file-size').textContent = (file.size / 1024).toFixed(1) + ' KB';
+    document.getElementById('file-info').style.display = 'block';
+    document.getElementById('process-btn').disabled = false;
+}
+
+function clearFile() {
+    selectedFile = null;
+    document.getElementById('file-info').style.display = 'none';
+    document.getElementById('process-btn').disabled = true;
+    document.getElementById('file-input').value = '';
+}
+
+async function processFile() {
+    if (!selectedFile) return;
+    
+    document.getElementById('progress-modal').classList.add('active');
+    document.getElementById('progress-bar').style.width = '10%';
+    document.getElementById('progress-text').textContent = 'Uploading file...';
+    
+    try {
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        
+        document.getElementById('progress-bar').style.width = '30%';
+        document.getElementById('progress-text').textContent = 'Processing complaints...';
+        
+        const res = await fetch('/api/batch/classify', {
+            method: 'POST',
+            body: formData
+        });
+        
+        document.getElementById('progress-bar').style.width = '80%';
+        
+        if (!res.ok) {
+            throw new Error('Processing failed');
+        }
+        
+        const data = await res.json();
+        results = data.results || [];
+        
+        document.getElementById('progress-bar').style.width = '100%';
+        document.getElementById('progress-text').textContent = 'Complete!';
+        
+        setTimeout(() => {
+            document.getElementById('progress-modal').classList.remove('active');
+            renderResults(results);
+            showToast(`Processed ${results.length} complaints`, 'success');
+        }, 500);
+        
+    } catch(e) {
+        document.getElementById('progress-modal').classList.remove('active');
+        showToast('Error: ' + e.message, 'error');
+    }
+}
+
+function renderResults(items) {
+    document.getElementById('results-section').style.display = 'block';
+    
+    const refunds = items.filter(r => r.decision === 'refund').length;
+    const denies = items.filter(r => r.decision === 'deny').length;
+    const escalates = items.filter(r => r.decision === 'escalate').length;
+    
+    document.getElementById('results-summary').textContent = 
+        `${items.length} processed: ${refunds} refunds, ${denies} denies, ${escalates} escalates`;
+    
+    const tbody = document.getElementById('results-body');
+    tbody.innerHTML = items.map(r => `
+        <tr>
+            <td style="font-family:monospace">${r.order_id}</td>
+            <td>${getDecisionBadge(r.decision)}</td>
+            <td>${r.confidence ? Math.round(r.confidence * 100) + '%' : '-'}</td>
+            <td>${getSeverityBadge(r.severity)}</td>
+            <td>${(r.categories || []).join(', ')}</td>
+        </tr>
+    `).join('');
+}
+
+function getDecisionBadge(d) {
+    const b = {refund:'<span class="badge badge-refund">Refund</span>',deny:'<span class="badge badge-deny">Deny</span>',escalate:'<span class="badge badge-escalate">Escalate</span>'};
+    return b[d] || b.escalate;
+}
+
+function getSeverityBadge(s) {
+    const b = {critical:'<span class="badge badge-critical">Critical</span>',high:'<span class="badge badge-high">High</span>',medium:'<span class="badge badge-medium">Medium</span>',low:'<span class="badge badge-low">Low</span>'};
+    return b[s] || b.medium;
+}
+
+function downloadResults() {
+    if (!results.length) return;
+    
+    const csv = 'order_id,decision,confidence,severity,categories\n' + 
+        results.map(r => `${r.order_id},${r.decision},${r.confidence},${r.severity},"${(r.categories || []).join(';')}"`).join('\n');
+    
+    const blob = new Blob([csv], {type: 'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'batch_results_' + new Date().toISOString().slice(0,10) + '.csv';
+    a.click();
+}
+</script>
+{% endblock %}

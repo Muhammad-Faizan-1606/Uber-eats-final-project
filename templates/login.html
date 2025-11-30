@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Uber Eats Admin</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        .login-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #000 0%, #0a1628 100%); padding: 20px; }
+        .login-card { width: 100%; max-width: 420px; background: var(--bg-card); border-radius: var(--radius-lg); padding: 40px; box-shadow: var(--shadow); }
+        .login-logo { text-align: center; margin-bottom: 32px; }
+        .login-logo .logo { font-size: 32px; }
+        .login-title { text-align: center; margin-bottom: 8px; font-size: 24px; font-weight: 700; }
+        .login-subtitle { text-align: center; color: var(--text-secondary); margin-bottom: 32px; font-size: 14px; }
+        .login-form { display: flex; flex-direction: column; gap: 20px; }
+        .login-form .form-group { display: flex; flex-direction: column; gap: 8px; }
+        .login-form label { font-size: 13px; font-weight: 500; color: var(--text-secondary); }
+        .login-form input { padding: 14px 16px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 15px; }
+        .login-form input:focus { outline: none; border-color: var(--accent); }
+        .login-form button { margin-top: 8px; }
+        .login-error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; padding: 12px 16px; border-radius: var(--radius); font-size: 14px; margin-bottom: 16px; }
+        .login-hint { text-align: center; margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border); }
+        .login-hint p { font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
+        .login-hint code { background: var(--bg-secondary); padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+        .back-link { display: block; text-align: center; margin-top: 24px; color: var(--text-secondary); font-size: 14px; }
+        .back-link:hover { color: var(--accent); }
+    </style>
+</head>
+<body>
+    <div class="login-page">
+        <div class="login-card">
+            <div class="login-logo">
+                <span class="logo"><span class="logo-uber">Uber</span><span class="logo-eats">Eats</span></span>
+            </div>
+            <h1 class="login-title">Admin Portal</h1>
+            <p class="login-subtitle">Sign in to manage complaints and analytics</p>
+            
+            {% if error %}
+            <div class="login-error">{{ error }}</div>
+            {% endif %}
+            
+            <form class="login-form" method="POST">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" name="username" required placeholder="Enter username" autofocus>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" name="password" required placeholder="Enter password">
+                </div>
+                <button type="submit" class="btn-primary btn-lg" style="width:100%;justify-content:center">Sign In</button>
+            </form>
+            
+            <div class="login-hint">
+                <p>Demo credentials:</p>
+                <p><code>admin</code> / <code>admin123</code> (Full access)</p>
+                <p><code>agent</code> / <code>agent123</code> (Agent access)</p>
+            </div>
+            
+            <a href="/" class="back-link">← Back to Home</a>
+        </div>
+    </div>
+</body>
+</html>

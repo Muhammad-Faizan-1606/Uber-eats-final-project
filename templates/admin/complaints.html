@@ -1,0 +1,379 @@
+{% extends "admin/base.html" %}
+{% block title %}Complaints{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Complaints</h1>
+    <div class="page-actions">
+        <button class="btn-secondary" onclick="exportCSV()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Export CSV
+        </button>
+    </div>
+</div>
+
+<div class="filters-bar">
+    <div class="filter-group">
+        <label>Decision</label>
+        <select id="filter-decision" onchange="loadComplaints()">
+            <option value="all">All Decisions</option>
+            <option value="refund">Refund</option>
+            <option value="deny">Deny</option>
+            <option value="escalate">Escalate</option>
+        </select>
+    </div>
+    <div class="filter-group">
+        <label>Severity</label>
+        <select id="filter-severity" onchange="loadComplaints()">
+            <option value="all">All Severities</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+        </select>
+    </div>
+    <div class="filter-group">
+        <label>SLA Status</label>
+        <select id="filter-sla" onchange="filterBySla()">
+            <option value="all">All</option>
+            <option value="overdue">Overdue</option>
+            <option value="urgent">Urgent (&lt;30m)</option>
+            <option value="ok">On Track</option>
+        </select>
+    </div>
+    <div class="filter-group">
+        <label>Search</label>
+        <input type="text" id="filter-search" placeholder="Order ID..." onkeyup="debounceSearch()">
+    </div>
+</div>
+
+<div class="data-card">
+    <table class="table" id="complaints-table">
+        <thead>
+            <tr>
+                <th>Complaint ID</th>
+                <th>Order</th>
+                <th>Category</th>
+                <th>Decision</th>
+                <th>Severity</th>
+                <th>SLA</th>
+                <th>Fraud</th>
+                <th>Confidence</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="complaints-body">
+            <tr>
+                <td colspan="9" class="table-empty">Loading...</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="pagination" id="pagination"></div>
+
+<!-- Complaint Detail Modal -->
+<div class="modal-overlay" id="detail-modal">
+    <div class="modal" style="max-width:800px">
+        <div class="modal-header">
+            <span class="modal-title">Complaint Details</span>
+            <button class="modal-close" onclick="closeDetailModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="detail-content">Loading...</div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeDetailModal()">Close</button>
+            <button class="btn-primary" id="btn-override" onclick="showOverrideModal()">Override Decision</button>
+        </div>
+    </div>
+</div>
+
+<!-- Override Modal -->
+<div class="modal-overlay" id="override-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="modal-title">Override Decision</span>
+            <button class="modal-close" onclick="closeOverrideModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="override-complaint-id">
+            <input type="hidden" id="override-original">
+            <div class="form-grid">
+                <div class="form-group full">
+                    <label>New Decision</label>
+                    <select id="override-decision">
+                        <option value="refund">✅ Refund</option>
+                        <option value="deny">❌ Deny</option>
+                        <option value="escalate">⏳ Escalate</option>
+                    </select>
+                </div>
+                <div class="form-group full">
+                    <label>Reason for Override</label>
+                    <textarea id="override-reason" rows="3"
+                        placeholder="Explain why you're changing this decision..."></textarea>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeOverrideModal()">Cancel</button>
+            <button class="btn-primary" onclick="submitOverride()">Submit Override</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentPage = 1;
+    let complaints = [];
+    let searchTimeout;
+
+    async function loadComplaints(page = 1) {
+        currentPage = page;
+        const decision = document.getElementById('filter-decision').value;
+        const severity = document.getElementById('filter-severity').value;
+        const search = document.getElementById('filter-search').value;
+
+        const params = new URLSearchParams({ page, status: decision, severity });
+
+        try {
+            // Use the existing complaints endpoint
+            const res = await fetch('/api/audit/?' + params);
+            const data = await res.json();
+            complaints = data.items || [];
+            renderComplaints(complaints);
+            renderPagination(data.total || 0, data.pages || 1);
+        } catch (e) {
+            console.error(e);
+            document.getElementById('complaints-body').innerHTML = '<tr><td colspan="9" class="table-empty">Error loading complaints: ' + e.message + '</td></tr>';
+        }
+    }
+
+    function renderComplaints(items) {
+        const tbody = document.getElementById('complaints-body');
+
+        if (!items || items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" class="table-empty">No complaints found</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = items.map(c => {
+            const sla = getSlaStatus(c.sla_deadline);
+            const categories = c.categories ? (typeof c.categories === 'string' ? JSON.parse(c.categories) : c.categories) : [];
+            const categoryStr = Array.isArray(categories) ? categories[0] : categories;
+
+            return `<tr>
+            <td style="font-family:monospace"><a href="#" onclick="showDetail('${c.complaint_id}')" style="color:var(--accent)">${(c.complaint_id || '').substring(0, 8)}...</a></td>
+            <td>${c.order_id || '-'}</td>
+            <td><span class="badge badge-outline">${(categoryStr || 'general').replace(/_/g, ' ')}</span></td>
+            <td>${getDecisionBadge(c.decision)}</td>
+            <td>${getSeverityBadge(c.severity)}</td>
+            <td><span class="sla-badge ${sla.class}">${sla.text}</span></td>
+            <td>${c.fraud_risk === 'high' || c.fraud_risk === 'critical' ? '<span class="badge badge-fraud">⚠️ ' + c.fraud_risk + '</span>' : '<span style="color:var(--text-muted)">low</span>'}</td>
+            <td>${c.confidence ? Math.round(c.confidence * 100) + '%' : '-'}</td>
+            <td>
+                <div class="feedback-btns">
+                    <button class="feedback-btn correct" onclick="quickFeedback('${c.complaint_id}', '${c.decision}', true)">✓</button>
+                    <button class="feedback-btn wrong" onclick="quickFeedback('${c.complaint_id}', '${c.decision}', false)">✗</button>
+                </div>
+            </td>
+        </tr>`;
+        }).join('');
+    }
+
+    function getDecisionBadge(decision) {
+        const badges = {
+            refund: '<span class="badge badge-refund">Refund</span>',
+            deny: '<span class="badge badge-deny">Deny</span>',
+            escalate: '<span class="badge badge-escalate">Escalate</span>'
+        };
+        return badges[decision] || badges.escalate;
+    }
+
+    function getSeverityBadge(severity) {
+        const badges = {
+            critical: '<span class="badge badge-critical">Critical</span>',
+            high: '<span class="badge badge-high">High</span>',
+            medium: '<span class="badge badge-medium">Medium</span>',
+            low: '<span class="badge badge-low">Low</span>'
+        };
+        return badges[severity] || badges.medium;
+    }
+
+    function renderPagination(total, pages) {
+        const container = document.getElementById('pagination');
+        if (pages <= 1) {
+            container.innerHTML = '';
+            return;
+        }
+
+        let html = `<button onclick="loadComplaints(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>← Prev</button>`;
+        for (let i = 1; i <= Math.min(pages, 5); i++) {
+            html += `<button onclick="loadComplaints(${i})" class="${i === currentPage ? 'active' : ''}">${i}</button>`;
+        }
+        html += `<button onclick="loadComplaints(${currentPage + 1})" ${currentPage >= pages ? 'disabled' : ''}>Next →</button>`;
+        container.innerHTML = html;
+    }
+
+    function filterBySla() {
+        const filter = document.getElementById('filter-sla').value;
+        const rows = document.querySelectorAll('#complaints-body tr');
+
+        rows.forEach(row => {
+            const slaCell = row.querySelector('.sla-badge');
+            if (!slaCell) return;
+
+            const isOverdue = slaCell.classList.contains('sla-overdue');
+            const isUrgent = slaCell.classList.contains('sla-urgent');
+
+            if (filter === 'all') row.style.display = '';
+            else if (filter === 'overdue') row.style.display = isOverdue ? '' : 'none';
+            else if (filter === 'urgent') row.style.display = isUrgent ? '' : 'none';
+            else if (filter === 'ok') row.style.display = (!isOverdue && !isUrgent) ? '' : 'none';
+        });
+    }
+
+    function debounceSearch() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => loadComplaints(), 300);
+    }
+
+    async function showDetail(complaintId) {
+        document.getElementById('detail-modal').classList.add('active');
+        document.getElementById('detail-content').innerHTML = 'Loading...';
+
+        // Find in current data or fetch
+        const c = complaints.find(x => x.complaint_id === complaintId);
+        if (c) {
+            renderDetail(c);
+        }
+    }
+
+    function renderDetail(c) {
+        const categories = c.categories ? (typeof c.categories === 'string' ? JSON.parse(c.categories) : c.categories) : [];
+        const caseData = c.case_data ? (typeof c.case_data === 'string' ? JSON.parse(c.case_data) : c.case_data) : {};
+        const sla = getSlaStatus(c.sla_deadline);
+
+        document.getElementById('override-complaint-id').value = c.complaint_id;
+        document.getElementById('override-original').value = c.decision;
+
+        document.getElementById('detail-content').innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+            <div>
+                <h4 style="margin-bottom:16px;color:var(--text-muted);font-size:12px;text-transform:uppercase">Complaint Info</h4>
+                <div style="background:var(--bg-secondary);border-radius:var(--radius);padding:16px">
+                    <p><strong>ID:</strong> ${c.complaint_id}</p>
+                    <p><strong>Order:</strong> ${c.order_id}</p>
+                    <p><strong>Customer:</strong> <a href="/admin/customers?id=${c.customer_id}" style="color:var(--accent)">${c.customer_id || 'Anonymous'}</a></p>
+                    <p><strong>Time:</strong> ${formatDate(c.timestamp)}</p>
+                    <p><strong>Categories:</strong> ${categories.join(', ') || 'N/A'}</p>
+                </div>
+            </div>
+            <div>
+                <h4 style="margin-bottom:16px;color:var(--text-muted);font-size:12px;text-transform:uppercase">Decision</h4>
+                <div style="background:var(--bg-secondary);border-radius:var(--radius);padding:16px">
+                    <p><strong>Decision:</strong> ${getDecisionBadge(c.decision)}</p>
+                    <p><strong>Confidence:</strong> ${c.confidence ? Math.round(c.confidence * 100) + '%' : '-'}</p>
+                    <p><strong>Source:</strong> ${c.source || 'system'}</p>
+                    <p><strong>Rule:</strong> ${c.rule_id || 'N/A'}</p>
+                </div>
+            </div>
+            <div>
+                <h4 style="margin-bottom:16px;color:var(--text-muted);font-size:12px;text-transform:uppercase">Priority & SLA</h4>
+                <div style="background:var(--bg-secondary);border-radius:var(--radius);padding:16px">
+                    <p><strong>Severity:</strong> ${getSeverityBadge(c.severity)}</p>
+                    <p><strong>SLA Status:</strong> <span class="sla-badge ${sla.class}">${sla.text}</span></p>
+                    <p><strong>SLA Deadline:</strong> ${c.sla_deadline ? formatDate(c.sla_deadline) : 'N/A'}</p>
+                </div>
+            </div>
+            <div>
+                <h4 style="margin-bottom:16px;color:var(--text-muted);font-size:12px;text-transform:uppercase">Fraud Analysis</h4>
+                <div style="background:var(--bg-secondary);border-radius:var(--radius);padding:16px">
+                    <p><strong>Risk Level:</strong> ${c.fraud_risk === 'high' || c.fraud_risk === 'critical' ? '<span class="badge badge-fraud">⚠️ ' + c.fraud_risk + '</span>' : c.fraud_risk || 'low'}</p>
+                    <p><strong>Score:</strong> ${c.fraud_score ? (c.fraud_score * 100).toFixed(0) + '%' : '0%'}</p>
+                    <p><strong>Root Cause:</strong> ${c.root_cause || 'Unknown'}</p>
+                </div>
+            </div>
+        </div>
+        ${caseData.complaint_text ? `
+        <div style="margin-top:24px">
+            <h4 style="margin-bottom:16px;color:var(--text-muted);font-size:12px;text-transform:uppercase">Customer Message</h4>
+            <div style="background:var(--bg-secondary);border-radius:var(--radius);padding:16px;font-style:italic;color:var(--text-secondary)">
+                "${caseData.complaint_text}"
+            </div>
+        </div>
+        ` : ''}
+    `;
+    }
+
+    function closeDetailModal() {
+        document.getElementById('detail-modal').classList.remove('active');
+    }
+
+    function showOverrideModal() {
+        closeDetailModal();
+        document.getElementById('override-modal').classList.add('active');
+    }
+
+    function closeOverrideModal() {
+        document.getElementById('override-modal').classList.remove('active');
+    }
+
+    async function submitOverride() {
+        const complaintId = document.getElementById('override-complaint-id').value;
+        const original = document.getElementById('override-original').value;
+        const corrected = document.getElementById('override-decision').value;
+        const reason = document.getElementById('override-reason').value;
+
+        try {
+            const res = await fetch('/api/feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    complaint_id: complaintId,
+                    original_decision: original,
+                    corrected_decision: corrected,
+                    reason: reason
+                })
+            });
+            if (res.ok) {
+                showToast('Decision overridden successfully!', 'success');
+                closeOverrideModal();
+                loadComplaints(currentPage);
+            }
+        } catch (e) {
+            showToast('Error: ' + e.message, 'error');
+        }
+    }
+
+    async function quickFeedback(complaintId, original, isCorrect) {
+        if (isCorrect) {
+            await fetch('/api/feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    complaint_id: complaintId,
+                    original_decision: original,
+                    corrected_decision: original,
+                    reason: 'Marked as correct'
+                })
+            });
+            showToast('Marked as correct ✓', 'success');
+        } else {
+            document.getElementById('override-complaint-id').value = complaintId;
+            document.getElementById('override-original').value = original;
+            document.getElementById('override-modal').classList.add('active');
+        }
+    }
+
+    function exportCSV() {
+        window.location.href = '/api/audit/export.csv';
+    }
+
+    // Initial load
+    loadComplaints();
+</script>
+{% endblock %}

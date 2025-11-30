@@ -1,0 +1,275 @@
+{% extends "admin/base.html" %}
+{% block title %}Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Analytics</h1>
+    <div class="page-actions">
+        <div class="filter-group" style="flex-direction:row;align-items:center;gap:8px">
+            <label style="margin:0">Period:</label>
+            <select id="period-select" onchange="loadAnalytics()">
+                <option value="7">Last 7 days</option>
+                <option value="30" selected>Last 30 days</option>
+                <option value="90">Last 90 days</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div class="stats-grid" id="stats-grid">
+    <div class="stat-card"><div class="stat-label">Loading...</div></div>
+</div>
+
+<div class="charts-grid">
+    <div class="chart-card">
+        <h3>Complaint Volume Trend</h3>
+        <div class="chart-container"><canvas id="volumeChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <h3>Decision Distribution Over Time</h3>
+        <div class="chart-container"><canvas id="decisionTrendChart"></canvas></div>
+    </div>
+</div>
+
+<div class="charts-grid">
+    <div class="chart-card">
+        <h3>Severity Distribution</h3>
+        <div class="chart-container"><canvas id="severityChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <h3>Fraud Detection Rate</h3>
+        <div class="chart-container"><canvas id="fraudChart"></canvas></div>
+    </div>
+</div>
+
+<div class="charts-grid">
+    <div class="chart-card" style="grid-column: span 2">
+        <h3>Root Cause Analysis</h3>
+        <div class="chart-container" style="height:350px"><canvas id="rootCauseChart"></canvas></div>
+    </div>
+</div>
+
+<div class="charts-grid">
+    <div class="chart-card">
+        <h3>Model Performance</h3>
+        <div id="model-stats" style="padding:20px">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;text-align:center">
+                <div>
+                    <div style="font-size:36px;font-weight:800;color:var(--accent)" id="accuracy">-</div>
+                    <div style="font-size:12px;color:var(--text-muted)">Avg Confidence</div>
+                </div>
+                <div>
+                    <div style="font-size:36px;font-weight:800;color:#3b82f6" id="ml-decisions">-</div>
+                    <div style="font-size:12px;color:var(--text-muted)">ML Decisions</div>
+                </div>
+                <div>
+                    <div style="font-size:36px;font-weight:800;color:#8b5cf6" id="policy-decisions">-</div>
+                    <div style="font-size:12px;color:var(--text-muted)">Policy Decisions</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="chart-card">
+        <h3>Human Feedback Loop</h3>
+        <div id="feedback-stats" style="padding:20px">
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;text-align:center">
+                <div>
+                    <div style="font-size:36px;font-weight:800;color:var(--accent)" id="correct-rate">-</div>
+                    <div style="font-size:12px;color:var(--text-muted)">Marked Correct</div>
+                </div>
+                <div>
+                    <div style="font-size:36px;font-weight:800;color:var(--danger)" id="override-rate">-</div>
+                    <div style="font-size:12px;color:var(--text-muted)">Overridden</div>
+                </div>
+            </div>
+            <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border)">
+                <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Feedback helps improve model accuracy</p>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="feedback-progress" style="width:0%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let charts = {};
+
+async function loadAnalytics() {
+    const days = document.getElementById('period-select').value;
+    
+    try {
+        // Load overview stats
+        const overview = await fetch(`/api/analytics/overview?days=${days}`).then(r => r.json());
+        renderStats(overview);
+        
+        // Load timeseries
+        const volume = await fetch(`/api/analytics/timeseries?days=${days}&metric=volume`).then(r => r.json());
+        renderVolumeChart(volume);
+        
+        const severity = await fetch(`/api/analytics/timeseries?days=${days}&metric=severity`).then(r => r.json());
+        renderSeverityChart(severity);
+        
+        const fraud = await fetch(`/api/analytics/timeseries?days=${days}&metric=fraud`).then(r => r.json());
+        renderFraudChart(fraud);
+        
+        // Load root causes
+        const rootCauses = await fetch(`/api/analytics/root-causes?days=${days}`).then(r => r.json());
+        renderRootCauseChart(rootCauses);
+        
+        // Update model stats
+        updateModelStats(overview);
+        
+    } catch(e) {
+        console.error('Error loading analytics:', e);
+    }
+}
+
+function renderStats(data) {
+    document.getElementById('stats-grid').innerHTML = `
+        <div class="stat-card">
+            <div class="stat-label">Total Complaints</div>
+            <div class="stat-value">${data.total_complaints || 0}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Refund Rate</div>
+            <div class="stat-value">${data.by_decision?.refund ? Math.round(data.by_decision.refund / data.total_complaints * 100) : 0}%</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Fraud Flagged</div>
+            <div class="stat-value" style="color:var(--danger)">${data.fraud_flagged || 0}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">SLA Compliance</div>
+            <div class="stat-value" style="color:var(--accent)">${Math.round((data.sla_compliance || 0.95) * 100)}%</div>
+        </div>
+    `;
+}
+
+function renderVolumeChart(data) {
+    if (charts.volume) charts.volume.destroy();
+    charts.volume = new Chart(document.getElementById('volumeChart'), {
+        type: 'line',
+        data: {
+            labels: data.labels || [],
+            datasets: [{
+                label: 'Complaints',
+                data: data.values || [],
+                borderColor: '#22c55e',
+                backgroundColor: 'rgba(34,197,94,0.1)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { display: false }, ticks: { color: '#6b7280' } },
+                y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280' }, beginAtZero: true }
+            }
+        }
+    });
+}
+
+function renderSeverityChart(data) {
+    if (charts.severity) charts.severity.destroy();
+    const colors = { critical: '#dc2626', high: '#ea580c', medium: '#ca8a04', low: '#16a34a' };
+    charts.severity = new Chart(document.getElementById('severityChart'), {
+        type: 'doughnut',
+        data: {
+            labels: (data.labels || []).map(l => l ? l.charAt(0).toUpperCase() + l.slice(1) : 'Unknown'),
+            datasets: [{
+                data: data.values || [],
+                backgroundColor: (data.labels || []).map(l => colors[l] || '#6b7280'),
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'right', labels: { color: '#9ca3af', padding: 16 } } }
+        }
+    });
+}
+
+function renderFraudChart(data) {
+    if (charts.fraud) charts.fraud.destroy();
+    charts.fraud = new Chart(document.getElementById('fraudChart'), {
+        type: 'bar',
+        data: {
+            labels: data.labels || [],
+            datasets: [
+                {
+                    label: 'Flagged',
+                    data: data.flagged || [],
+                    backgroundColor: 'rgba(239,68,68,0.8)',
+                    borderRadius: 4
+                },
+                {
+                    label: 'Total',
+                    data: data.total || [],
+                    backgroundColor: 'rgba(255,255,255,0.1)',
+                    borderRadius: 4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'top', labels: { color: '#9ca3af' } } },
+            scales: {
+                x: { grid: { display: false }, ticks: { color: '#6b7280' }, stacked: false },
+                y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280' }, beginAtZero: true }
+            }
+        }
+    });
+}
+
+function renderRootCauseChart(data) {
+    if (charts.rootCause) charts.rootCause.destroy();
+    const causes = data.causes || [];
+    charts.rootCause = new Chart(document.getElementById('rootCauseChart'), {
+        type: 'bar',
+        data: {
+            labels: causes.map(c => (c.cause || 'unknown').replace(/_/g, ' ')),
+            datasets: [{
+                label: 'Occurrences',
+                data: causes.map(c => c.count),
+                backgroundColor: [
+                    '#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'
+                ],
+                borderRadius: 8
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280' }, beginAtZero: true },
+                y: { grid: { display: false }, ticks: { color: '#6b7280' } }
+            }
+        }
+    });
+}
+
+function updateModelStats(data) {
+    document.getElementById('accuracy').textContent = Math.round((data.avg_confidence || 0) * 100) + '%';
+    document.getElementById('ml-decisions').textContent = data.by_source?.ml || 0;
+    document.getElementById('policy-decisions').textContent = data.by_source?.policy || 0;
+    
+    // Placeholder feedback stats
+    document.getElementById('correct-rate').textContent = '87%';
+    document.getElementById('override-rate').textContent = '13%';
+    document.getElementById('feedback-progress').style.width = '87%';
+}
+
+// Initial load
+loadAnalytics();
+</script>
+{% endblock %}

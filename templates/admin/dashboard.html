@@ -1,0 +1,290 @@
+{% extends "admin/base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Dashboard</h1>
+    <div class="user-info">
+        <span style="color:var(--text-secondary);font-size:14px">{{ session.name }}</span>
+        <div class="user-avatar">{{ session.name[0] if session.name else 'A' }}</div>
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">Total Complaints</div>
+        <div class="stat-value">{{ stats.total or 0 }}</div>
+        <div class="stat-change up">Last 30 days</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Refund Rate</div>
+        <div class="stat-value">{{ ((stats.by_decision.refund or 0) / (stats.total or 1) * 100)|round|int }}%</div>
+        <div class="stat-change">{{ stats.by_decision.refund or 0 }} approved</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Avg Confidence</div>
+        <div class="stat-value">{{ (stats.avg_confidence * 100)|round|int }}%</div>
+        <div class="stat-change up">ML accuracy</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Fraud Flagged</div>
+        <div class="stat-value" style="color:var(--danger)">{{ stats.fraud_flagged or 0 }}</div>
+        <div class="stat-change down">needs review</div>
+    </div>
+</div>
+
+<div class="charts-grid">
+    <div class="chart-card">
+        <h3>Complaints Over Time</h3>
+        <div class="chart-container"><canvas id="trendChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <h3>Decision Distribution</h3>
+        <div class="chart-container"><canvas id="decisionChart"></canvas></div>
+    </div>
+</div>
+
+<div class="charts-grid">
+    <div class="chart-card">
+        <h3>Severity Breakdown</h3>
+        <div class="chart-container"><canvas id="severityChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <h3>Issue Categories</h3>
+        <div class="chart-container"><canvas id="categoryChart"></canvas></div>
+    </div>
+</div>
+
+<div class="data-card">
+    <div class="data-card-header">
+        <h3>Recent Complaints (with SLA)</h3>
+        <a href="/admin/complaints" class="btn-secondary btn-sm">View All →</a>
+    </div>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Order</th>
+                <th>Decision</th>
+                <th>Severity</th>
+                <th>SLA Status</th>
+                <th>Confidence</th>
+                <th>Feedback</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in recent %}
+            <tr>
+                <td style="font-family:monospace;color:var(--text-muted)">{{ item.complaint_id[:8] if item.complaint_id else '-' }}...</td>
+                <td>{{ item.order_id or '-' }}</td>
+                <td>
+                    {% if item.decision == 'refund' %}<span class="badge badge-refund">Refund</span>
+                    {% elif item.decision == 'deny' %}<span class="badge badge-deny">Deny</span>
+                    {% else %}<span class="badge badge-escalate">Escalate</span>{% endif %}
+                </td>
+                <td>
+                    {% if item.severity == 'critical' %}<span class="badge badge-critical">Critical</span>
+                    {% elif item.severity == 'high' %}<span class="badge badge-high">High</span>
+                    {% elif item.severity == 'medium' %}<span class="badge badge-medium">Medium</span>
+                    {% else %}<span class="badge badge-low">Low</span>{% endif %}
+                </td>
+                <td>
+                    <span class="sla-badge" id="sla-{{ loop.index }}" data-deadline="{{ item.sla_deadline }}">-</span>
+                </td>
+                <td>{{ (item.confidence * 100)|round|int if item.confidence else '-' }}%</td>
+                <td>
+                    <div class="feedback-btns">
+                        <button class="feedback-btn correct" onclick="submitFeedback('{{ item.complaint_id }}', '{{ item.decision }}', '{{ item.decision }}')">✓</button>
+                        <button class="feedback-btn wrong" onclick="showFeedbackModal('{{ item.complaint_id }}', '{{ item.decision }}')">✗</button>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            {% if not recent %}
+            <tr><td colspan="7" class="table-empty">No complaints yet. Submit one from the homepage!</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Feedback Modal -->
+<div class="modal-overlay" id="feedback-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="modal-title">Correct Decision</span>
+            <button class="modal-close" onclick="closeFeedbackModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p style="margin-bottom:16px;color:var(--text-secondary)">What should the correct decision be?</p>
+            <input type="hidden" id="feedback-complaint-id">
+            <input type="hidden" id="feedback-original">
+            <div class="form-grid">
+                <div class="form-group full">
+                    <label>Correct Decision</label>
+                    <select id="feedback-corrected">
+                        <option value="refund">Refund</option>
+                        <option value="deny">Deny</option>
+                        <option value="escalate">Escalate</option>
+                    </select>
+                </div>
+                <div class="form-group full">
+                    <label>Reason (optional)</label>
+                    <textarea id="feedback-reason" rows="3" placeholder="Why is this the correct decision?"></textarea>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeFeedbackModal()">Cancel</button>
+            <button class="btn-primary" onclick="submitFeedbackFromModal()">Submit Feedback</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const stats = {{ stats|tojson|safe }};
+
+// Update SLA badges
+document.querySelectorAll('[id^="sla-"]').forEach(el => {
+    const deadline = el.dataset.deadline;
+    const status = getSlaStatus(deadline);
+    el.className = 'sla-badge ' + status.class;
+    el.textContent = status.text;
+});
+
+// Trend Chart
+const trend = stats.daily_trend || [];
+new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: {
+        labels: trend.map(d => d.day),
+        datasets: [{
+            label: 'Complaints',
+            data: trend.map(d => d.count),
+            borderColor: '#22c55e',
+            backgroundColor: 'rgba(34,197,94,0.1)',
+            fill: true,
+            tension: 0.4
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { grid: { display: false }, ticks: { color: '#6b7280' } },
+            y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280' }, beginAtZero: true }
+        }
+    }
+});
+
+// Decision Chart
+const decisions = stats.by_decision || {};
+new Chart(document.getElementById('decisionChart'), {
+    type: 'doughnut',
+    data: {
+        labels: Object.keys(decisions).map(k => k.charAt(0).toUpperCase() + k.slice(1)),
+        datasets: [{
+            data: Object.values(decisions),
+            backgroundColor: ['#22c55e', '#ef4444', '#f59e0b'],
+            borderWidth: 0
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { color: '#9ca3af', padding: 16 } } }
+    }
+});
+
+// Severity Chart
+const severity = stats.by_severity || {};
+new Chart(document.getElementById('severityChart'), {
+    type: 'bar',
+    data: {
+        labels: Object.keys(severity).map(k => k.charAt(0).toUpperCase() + k.slice(1)),
+        datasets: [{
+            data: Object.values(severity),
+            backgroundColor: ['#dc2626', '#ea580c', '#ca8a04', '#16a34a'],
+            borderRadius: 8
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { grid: { display: false }, ticks: { color: '#6b7280' } },
+            y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280' }, beginAtZero: true }
+        }
+    }
+});
+
+// Category Chart
+const categories = stats.by_category || {};
+new Chart(document.getElementById('categoryChart'), {
+    type: 'bar',
+    data: {
+        labels: Object.keys(categories).map(k => k.replace(/_/g, ' ')),
+        datasets: [{
+            data: Object.values(categories),
+            backgroundColor: '#3b82f6',
+            borderRadius: 8
+        }]
+    },
+    options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280' }, beginAtZero: true },
+            y: { grid: { display: false }, ticks: { color: '#6b7280' } }
+        }
+    }
+});
+
+// Feedback functions
+function showFeedbackModal(complaintId, original) {
+    document.getElementById('feedback-complaint-id').value = complaintId;
+    document.getElementById('feedback-original').value = original;
+    document.getElementById('feedback-modal').classList.add('active');
+}
+
+function closeFeedbackModal() {
+    document.getElementById('feedback-modal').classList.remove('active');
+}
+
+async function submitFeedback(complaintId, original, corrected, reason = '') {
+    try {
+        const res = await fetch('/api/feedback', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                complaint_id: complaintId,
+                original_decision: original,
+                corrected_decision: corrected,
+                reason: reason
+            })
+        });
+        if (res.ok) {
+            showToast('Feedback submitted!', 'success');
+        } else {
+            showToast('Failed to submit feedback', 'error');
+        }
+    } catch(e) {
+        showToast('Error: ' + e.message, 'error');
+    }
+}
+
+async function submitFeedbackFromModal() {
+    const complaintId = document.getElementById('feedback-complaint-id').value;
+    const original = document.getElementById('feedback-original').value;
+    const corrected = document.getElementById('feedback-corrected').value;
+    const reason = document.getElementById('feedback-reason').value;
+    await submitFeedback(complaintId, original, corrected, reason);
+    closeFeedbackModal();
+}
+</script>
+{% endblock %}

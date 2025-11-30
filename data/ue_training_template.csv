@@ -1,6 +1,0 @@
-order_status,refund_history_30d,handoff_photo,courier_rating,label
-missing_delivery,0,false,4.7,escalate
-damaged_item,0,true,4.6,refund
-wrong_item,1,true,4.8,refund
-late_delivery,0,true,4.0,refund
-missing_delivery,3,false,4.9,deny

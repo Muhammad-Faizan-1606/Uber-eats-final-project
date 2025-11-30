@@ -1,0 +1,252 @@
+{% extends "admin/base.html" %}
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Settings</h1>
+</div>
+
+<div class="charts-grid">
+    <!-- SMTP Settings -->
+    <div class="chart-card">
+        <h3>📧 Email / SMTP Configuration</h3>
+        <div id="smtp-status" style="margin-bottom:20px;padding:16px;border-radius:var(--radius)"></div>
+        
+        <div class="form-grid">
+            <div class="form-group">
+                <label>SMTP Host</label>
+                <input type="text" id="smtp-host" value="smtp.gmail.com" disabled>
+            </div>
+            <div class="form-group">
+                <label>SMTP Port</label>
+                <input type="text" id="smtp-port" value="465" disabled>
+            </div>
+            <div class="form-group full">
+                <label>SMTP User</label>
+                <input type="text" id="smtp-user" placeholder="Configured in .env file" disabled>
+            </div>
+        </div>
+        
+        <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">
+            <h4 style="font-size:14px;margin-bottom:12px">Test Email</h4>
+            <div style="display:flex;gap:12px">
+                <input type="email" id="test-email" placeholder="Enter email address..." style="flex:1;padding:12px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+                <button class="btn-primary" onclick="sendTestEmail()">Send Test</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- SLA Configuration -->
+    <div class="chart-card">
+        <h3>⏱️ SLA Configuration</h3>
+        <p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Response time targets by severity level</p>
+        
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Critical (minutes)</label>
+                <input type="number" id="sla-critical" value="30">
+            </div>
+            <div class="form-group">
+                <label>High (minutes)</label>
+                <input type="number" id="sla-high" value="120">
+            </div>
+            <div class="form-group">
+                <label>Medium (minutes)</label>
+                <input type="number" id="sla-medium" value="480">
+            </div>
+            <div class="form-group">
+                <label>Low (minutes)</label>
+                <input type="number" id="sla-low" value="1440">
+            </div>
+        </div>
+        
+        <button class="btn-secondary" style="margin-top:16px" onclick="saveSlaSettings()">Save SLA Settings</button>
+    </div>
+</div>
+
+<div class="charts-grid">
+    <!-- Fraud Detection Thresholds -->
+    <div class="chart-card">
+        <h3>🛡️ Fraud Detection Thresholds</h3>
+        <p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Adjust sensitivity of fraud detection</p>
+        
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Max Complaints (30 days)</label>
+                <input type="number" id="fraud-complaints-30d" value="3">
+            </div>
+            <div class="form-group">
+                <label>Max Complaints (7 days)</label>
+                <input type="number" id="fraud-complaints-7d" value="2">
+            </div>
+            <div class="form-group">
+                <label>Max Refund Rate (%)</label>
+                <input type="number" id="fraud-refund-rate" value="70" min="0" max="100">
+            </div>
+            <div class="form-group">
+                <label>High Value Threshold ($)</label>
+                <input type="number" id="fraud-high-value" value="50">
+            </div>
+        </div>
+        
+        <button class="btn-secondary" style="margin-top:16px" onclick="saveFraudSettings()">Save Fraud Settings</button>
+    </div>
+    
+    <!-- Model Settings -->
+    <div class="chart-card">
+        <h3>🤖 ML Model Settings</h3>
+        <p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Machine learning classification settings</p>
+        
+        <div style="padding:16px;background:var(--bg-secondary);border-radius:var(--radius);margin-bottom:16px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+                <span>Model Status</span>
+                <span style="color:var(--accent)">● Active</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+                <span>Model Type</span>
+                <span>LogisticRegression</span>
+            </div>
+            <div style="display:flex;justify-content:space-between">
+                <span>Last Trained</span>
+                <span style="color:var(--text-muted)">-</span>
+            </div>
+        </div>
+        
+        <div class="form-group" style="margin-bottom:16px">
+            <label>Confidence Threshold (%)</label>
+            <input type="number" id="ml-confidence" value="60" min="0" max="100">
+            <small style="color:var(--text-muted)">Below this, escalate to human review</small>
+        </div>
+        
+        <div style="display:flex;gap:12px">
+            <button class="btn-secondary" onclick="retrainModel()">Retrain Model</button>
+            <button class="btn-outline" onclick="exportFeedback()">Export Feedback Data</button>
+        </div>
+    </div>
+</div>
+
+<div class="charts-grid">
+    <!-- Policy Rules -->
+    <div class="chart-card" style="grid-column: span 2">
+        <h3>📜 Policy Rules</h3>
+        <p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Rules are checked before ML model. Edit rules in <code>policies/policy_rules_base.json</code></p>
+        
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Rule ID</th>
+                    <th>Conditions</th>
+                    <th>Decision</th>
+                    <th>Confidence</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="rules-body">
+                <tr><td colspan="5" class="table-empty">Loading rules...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadSettings() {
+    // Load SMTP status
+    try {
+        const res = await fetch('/api/smtp/test', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({})});
+        const data = await res.json();
+        
+        const statusDiv = document.getElementById('smtp-status');
+        if (data.configured && data.connection_ok) {
+            statusDiv.innerHTML = '<span style="color:var(--accent)">✓ SMTP Connected</span> - ' + data.host + ':' + data.port;
+            statusDiv.style.background = 'var(--accent-soft)';
+        } else if (data.configured) {
+            statusDiv.innerHTML = '<span style="color:var(--warning)">⚠ Connection Failed</span> - ' + (data.error || 'Unknown error');
+            statusDiv.style.background = 'rgba(245,158,11,0.1)';
+        } else {
+            statusDiv.innerHTML = '<span style="color:var(--text-muted)">○ Not Configured</span> - Set SMTP credentials in .env file';
+            statusDiv.style.background = 'var(--bg-secondary)';
+        }
+        
+        if (data.user) document.getElementById('smtp-user').value = data.user;
+        if (data.host) document.getElementById('smtp-host').value = data.host;
+        if (data.port) document.getElementById('smtp-port').value = data.port;
+    } catch(e) {
+        console.error('Error loading SMTP status:', e);
+    }
+    
+    // Load rules
+    try {
+        const rules = [
+            {id: 'R-MISSING-NOPHOTO', conditions: 'Missing + No Photo', decision: 'escalate', confidence: 85, active: true},
+            {id: 'R-DAMAGED-PHOTO', conditions: 'Damaged + Photo', decision: 'refund', confidence: 80, active: true},
+            {id: 'R-HIGH-REFUNDS', conditions: 'Refunds >= 3', decision: 'deny', confidence: 90, active: true},
+            {id: 'R-LATE-FIRSTTIME', conditions: 'Late + First Time', decision: 'refund', confidence: 75, active: true},
+            {id: 'R-WRONG-ITEM', conditions: 'Wrong Item', decision: 'refund', confidence: 85, active: true},
+            {id: 'R-LOW-RATING', conditions: 'Late + Rating < 4', decision: 'refund', confidence: 80, active: true}
+        ];
+        
+        document.getElementById('rules-body').innerHTML = rules.map(r => `
+            <tr>
+                <td style="font-family:monospace">${r.id}</td>
+                <td>${r.conditions}</td>
+                <td>${getDecisionBadge(r.decision)}</td>
+                <td>${r.confidence}%</td>
+                <td><span style="color:var(--accent)">● Active</span></td>
+            </tr>
+        `).join('');
+    } catch(e) {
+        console.error('Error loading rules:', e);
+    }
+}
+
+function getDecisionBadge(d) {
+    const b = {refund:'<span class="badge badge-refund">Refund</span>',deny:'<span class="badge badge-deny">Deny</span>',escalate:'<span class="badge badge-escalate">Escalate</span>'};
+    return b[d] || b.escalate;
+}
+
+async function sendTestEmail() {
+    const email = document.getElementById('test-email').value;
+    if (!email) {
+        showToast('Please enter an email address', 'error');
+        return;
+    }
+    
+    try {
+        const res = await fetch('/api/smtp/test', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({email})
+        });
+        const data = await res.json();
+        
+        if (data.test_email_sent) {
+            showToast('Test email sent to ' + email, 'success');
+        } else {
+            showToast('Failed to send: ' + (data.error || 'Unknown error'), 'error');
+        }
+    } catch(e) {
+        showToast('Error: ' + e.message, 'error');
+    }
+}
+
+function saveSlaSettings() {
+    showToast('SLA settings saved (demo only)', 'success');
+}
+
+function saveFraudSettings() {
+    showToast('Fraud settings saved (demo only)', 'success');
+}
+
+function retrainModel() {
+    showToast('Model retraining started (demo only)', 'success');
+}
+
+function exportFeedback() {
+    showToast('Feedback export started (demo only)', 'success');
+}
+
+loadSettings();
+</script>
+{% endblock %}

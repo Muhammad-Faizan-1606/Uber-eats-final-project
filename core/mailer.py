@@ -1,105 +1,118 @@
-# core/mailer.py
-import os
-import smtplib
-import ssl
-from email.message import EmailMessage
-from typing import Dict, Any, Optional
-from html import escape
+"""
+Email Notification Module - Sends HTML emails with decision summaries.
+"""
 
-def _smtp_config():
-    """Read SMTP config from env with sane Gmail defaults."""
-    host = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    port = int(os.getenv("SMTP_PORT", "465"))  # 465=SSL, 587=STARTTLS
-    user = os.getenv("SMTP_USER")              # your Gmail address
-    pwd  = os.getenv("SMTP_PASS")              # your Gmail App Password
-    from_email = os.getenv("SMTP_FROM", user or "")
-    from_name  = os.getenv("SMTP_FROM_NAME", "Support Decisions")
-    reply_to   = os.getenv("SMTP_REPLY_TO", from_email)
-    timeout    = float(os.getenv("SMTP_TIMEOUT", "15"))
+import os
+import ssl
+import smtplib
+import logging
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from datetime import datetime
+from typing import Dict, Any
+
+logger = logging.getLogger(__name__)
+
+def _get_smtp_config():
     return {
-        "host": host, "port": port, "user": user, "pwd": pwd,
-        "from_email": from_email, "from_name": from_name,
-        "reply_to": reply_to, "timeout": timeout
+        "host": os.getenv("SMTP_HOST", "smtp.gmail.com"),
+        "port": int(os.getenv("SMTP_PORT", "465")),
+        "user": os.getenv("SMTP_USER", ""),
+        "password": os.getenv("SMTP_PASS", ""),
+        "from_email": os.getenv("SMTP_FROM", os.getenv("SMTP_USER", "")),
+        "from_name": os.getenv("SMTP_FROM_NAME", "Uber Eats Support"),
+        "timeout": int(os.getenv("SMTP_TIMEOUT", "30")),
     }
 
-def _send_email_raw(to_email: str, subject: str, text: str, html: Optional[str] = None):
-    cfg = _smtp_config()
-    if not cfg["user"] or not cfg["pwd"] or not cfg["from_email"]:
-        raise RuntimeError("SMTP not configured. Set SMTP_USER, SMTP_PASS, and SMTP_FROM.")
+def _get_decision_style(decision):
+    styles = {
+        "refund": {"bg": "#dcfce7", "border": "#22c55e", "text": "#166534", "icon": "✅", "title": "Refund Approved", "message": "Your refund request has been approved."},
+        "deny": {"bg": "#fee2e2", "border": "#ef4444", "text": "#991b1b", "icon": "❌", "title": "Request Declined", "message": "We are unable to process a refund for this order."},
+        "escalate": {"bg": "#fef3c7", "border": "#f59e0b", "text": "#92400e", "icon": "⏳", "title": "Under Review", "message": "Your case has been escalated for manual review."}
+    }
+    return styles.get(decision.lower(), styles["escalate"])
 
-    msg = EmailMessage()
-    msg["Subject"] = subject
-    msg["From"] = f'{cfg["from_name"]} <{cfg["from_email"]}>'
-    msg["To"] = to_email
-    if cfg["reply_to"]:
-        msg["Reply-To"] = cfg["reply_to"]
-
-    msg.set_content(text)
-    if html:
-        msg.add_alternative(html, subtype="html")
-
-    # SSL if 465, otherwise STARTTLS
-    if cfg["port"] == 465:
-        context = ssl.create_default_context()
-        with smtplib.SMTP_SSL(cfg["host"], cfg["port"], context=context, timeout=cfg["timeout"]) as smtp:
-            smtp.login(cfg["user"], cfg["pwd"])
-            smtp.send_message(msg)
-    else:
-        context = ssl.create_default_context()
-        with smtplib.SMTP(cfg["host"], cfg["port"], timeout=cfg["timeout"]) as smtp:
-            smtp.ehlo()
-            smtp.starttls(context=context)
-            smtp.login(cfg["user"], cfg["pwd"])
-            smtp.send_message(msg)
-
-def _format_email(case: Dict[str, Any], result: Dict[str, Any]) -> Dict[str, str]:
-    order_id = str(case.get("order_id", "Unknown"))
-    decision = (result.get("decision") or "").upper()
-    subject = f"Your order {order_id}: Decision — {decision}"
-
-    lines = [
-        f"Order ID: {order_id}",
-        f"Decision: {result.get('decision')}",
-        f"Confidence: {result.get('confidence')}",
-        f"Source: {result.get('source')}",
-        "",
-        f"Reason: {result.get('reason')}",
-        "",
-        "— This is an automated message."
-    ]
-    text = "\n".join(lines)
-
-    # Precompute/escape reason and replace newlines safely (no backslashes in f-expression)
-    reason_raw = str(result.get("reason") or "")
-    reason_html = escape(reason_raw).replace("\n", "<br>")
-
-    html = (
-        "<div style=\"font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;line-height:1.5;\">"
-        f"  <h2 style=\"margin:0 0 8px;\">Order {escape(order_id)}</h2>"
-        f"  <p style=\"margin:0 0 6px;\"><b>Decision:</b> {escape(str(result.get('decision')))}</p>"
-        f"  <p style=\"margin:0 0 6px;\"><b>Confidence:</b> {escape(str(result.get('confidence')))}</p>"
-        f"  <p style=\"margin:0 0 12px;\"><b>Source:</b> {escape(str(result.get('source')))}</p>"
-        "  <div style=\"padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;background:#f9fafb;\">"
-        "    <b>Reason</b><br>" + reason_html +
-        "  </div>"
-        "  <p style=\"color:#6b7280;font-size:12px;margin-top:12px;\">This is an automated message.</p>"
-        "</div>"
-    )
-
-    return {"subject": subject, "text": text, "html": html}
-
-def maybe_send_decision_email(to_email: str, case: Dict[str, Any], result: Dict[str, Any]) -> bool:
-    """
-    Best-effort: send to customer if valid-looking email.
-    Never raise, so the API response never breaks because of email.
-    """
-    if not to_email or "@" not in to_email or "." not in to_email.split("@")[-1]:
+def send_decision_email(to_email, order_id, decision, confidence, reason, category, source, severity="medium", sla_deadline="", rule_id=None, additional_info=""):
+    if not to_email:
+        return False
+    config = _get_smtp_config()
+    if not config["user"] or not config["password"]:
+        logger.warning("SMTP not configured")
         return False
     try:
-        payload = _format_email(case, result)
-        _send_email_raw(to_email, payload["subject"], payload["text"], payload["html"])
+        style = _get_decision_style(decision)
+        timestamp = datetime.now().strftime("%B %d, %Y at %I:%M %p")
+        category_display = category.replace("_", " ").title() if category else "General"
+        confidence_pct = f"{confidence * 100:.0f}%" if confidence else "N/A"
+        
+        html = f'''<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;font-family:-apple-system,sans-serif;background:#f3f4f6">
+<table width="100%" style="padding:40px 20px"><tr><td align="center">
+<table width="600" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1)">
+<tr><td style="background:linear-gradient(135deg,#000,#1f2937);padding:40px;text-align:center">
+<h1 style="margin:0;font-size:32px"><span style="color:#fff">Uber</span><span style="color:#22c55e">Eats</span></h1>
+<p style="margin:10px 0 0;color:#9ca3af;font-size:14px">Complaint Resolution Center</p></td></tr>
+<tr><td style="padding:40px">
+<table width="100%" style="background:{style['bg']};border:2px solid {style['border']};border-radius:16px">
+<tr><td style="padding:32px;text-align:center">
+<div style="font-size:56px;margin-bottom:16px">{style['icon']}</div>
+<h2 style="margin:0;font-size:28px;color:{style['text']}">{style['title']}</h2>
+<p style="margin:12px 0 0;color:{style['text']}">{style['message']}</p></td></tr></table></td></tr>
+<tr><td style="padding:0 40px 32px">
+<h3 style="margin:0 0 20px;border-bottom:2px solid #e5e7eb;padding-bottom:12px">📋 Details</h3>
+<table width="100%" style="font-size:15px">
+<tr><td style="padding:14px 0;border-bottom:1px solid #f3f4f6;color:#6b7280">Order ID</td><td style="padding:14px 0;border-bottom:1px solid #f3f4f6;font-weight:600">{order_id}</td></tr>
+<tr><td style="padding:14px 0;border-bottom:1px solid #f3f4f6;color:#6b7280">Category</td><td style="padding:14px 0;border-bottom:1px solid #f3f4f6;font-weight:600">{category_display}</td></tr>
+<tr><td style="padding:14px 0;border-bottom:1px solid #f3f4f6;color:#6b7280">Priority</td><td style="padding:14px 0;border-bottom:1px solid #f3f4f6"><span style="background:{'#dc2626' if severity=='critical' else '#ea580c' if severity=='high' else '#ca8a04' if severity=='medium' else '#16a34a'};color:white;padding:4px 12px;border-radius:12px;font-size:12px">{severity.upper()}</span></td></tr>
+<tr><td style="padding:14px 0;border-bottom:1px solid #f3f4f6;color:#6b7280">Confidence</td><td style="padding:14px 0;border-bottom:1px solid #f3f4f6;font-weight:600">{confidence_pct}</td></tr>
+<tr><td style="padding:14px 0;color:#6b7280">Processed</td><td style="padding:14px 0">{timestamp}</td></tr></table></td></tr>
+<tr><td style="padding:0 40px 32px">
+<div style="background:#f8fafc;border-radius:12px;padding:20px;border-left:4px solid {style['border']}">
+<h4 style="margin:0 0 10px;font-size:14px;color:#374151">💬 Reason</h4>
+<p style="margin:0;font-size:15px;color:#4b5563;line-height:1.7">{reason}</p></div></td></tr>
+<tr><td style="background:#f9fafb;padding:32px 40px;border-top:1px solid #e5e7eb">
+<p style="margin:0;font-size:12px;color:#6b7280">Reference: {order_id} • {timestamp}</p></td></tr>
+</table></td></tr></table></body></html>'''
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"Uber Eats: {decision.upper()} - Order {order_id}"
+        msg["From"] = f"{config['from_name']} <{config['from_email']}>"
+        msg["To"] = to_email
+        msg.attach(MIMEText(f"Decision: {decision.upper()}\nOrder: {order_id}\nReason: {reason}", "plain"))
+        msg.attach(MIMEText(html, "html"))
+        
+        if config["port"] == 465:
+            ctx = ssl.create_default_context()
+            with smtplib.SMTP_SSL(config["host"], config["port"], context=ctx, timeout=config["timeout"]) as s:
+                s.login(config["user"], config["password"])
+                s.sendmail(config["from_email"], to_email, msg.as_string())
+        else:
+            with smtplib.SMTP(config["host"], config["port"], timeout=config["timeout"]) as s:
+                s.starttls()
+                s.login(config["user"], config["password"])
+                s.sendmail(config["from_email"], to_email, msg.as_string())
+        logger.info(f"Email sent to {to_email}")
         return True
     except Exception as e:
-        # Log to console; you can wire this to your audit if you want.
-        print(f"[mailer] failed to send to {to_email}: {e}")
+        logger.error(f"Email error: {e}")
         return False
+
+def test_smtp_connection():
+    config = _get_smtp_config()
+    result = {"configured": bool(config["user"] and config["password"]), "host": config["host"], "port": config["port"], "connection_ok": False, "error": None}
+    if not result["configured"]:
+        result["error"] = "SMTP not configured"
+        return result
+    try:
+        if config["port"] == 465:
+            with smtplib.SMTP_SSL(config["host"], config["port"], context=ssl.create_default_context(), timeout=10) as s:
+                s.login(config["user"], config["password"])
+                result["connection_ok"] = True
+        else:
+            with smtplib.SMTP(config["host"], config["port"], timeout=10) as s:
+                s.starttls()
+                s.login(config["user"], config["password"])
+                result["connection_ok"] = True
+    except Exception as e:
+        result["error"] = str(e)
+    return result

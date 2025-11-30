@@ -1,43 +1,11 @@
 {
-  "version": "1.0",
+  "version": "2.0",
   "rules": [
-    {
-      "id": "R-MISS-NOPHOTO",
-      "if": {
-        "order_status": "missing_delivery",
-        "handoff_photo": false
-      },
-      "then": {
-        "decision": "escalate",
-        "reason": "No proof of handoff on missing delivery",
-        "category": "missing_delivery"
-      },
-      "confidence": 0.85
-    },
-    {
-      "id": "R-DAMAGED-PHOTO",
-      "if": {
-        "order_status": "damaged_item",
-        "handoff_photo": true
-      },
-      "then": {
-        "decision": "refund",
-        "reason": "Photo exists but item reported damaged; refund",
-        "category": "quality_issue"
-      },
-      "confidence": 0.8
-    },
-    {
-      "id": "R-HIGH-REFUNDS",
-      "if": {
-        "refund_history_30d": ">=3"
-      },
-      "then": {
-        "decision": "deny",
-        "reason": "High refund frequency in last 30d",
-        "category": "abuse_risk"
-      },
-      "confidence": 0.9
-    }
+    {"id": "R-MISSING-NOPHOTO", "conditions": {"order_status": "missing_delivery", "handoff_photo": false}, "decision": "escalate", "confidence": 0.85, "reason": "Missing delivery requires verification - no photo available", "category": "missing_delivery"},
+    {"id": "R-DAMAGED-PHOTO", "conditions": {"order_status": "damaged_item", "handoff_photo": true}, "decision": "refund", "confidence": 0.80, "reason": "Damage confirmed with delivery photo", "category": "damaged_item"},
+    {"id": "R-HIGH-REFUNDS", "conditions": {"refund_history_30d": {"op": "gte", "value": 3}}, "decision": "deny", "confidence": 0.90, "reason": "High refund frequency - requires verification", "category": "abuse_risk"},
+    {"id": "R-LATE-FIRSTTIME", "conditions": {"order_status": "late_delivery", "refund_history_30d": 0}, "decision": "refund", "confidence": 0.75, "reason": "First complaint - goodwill refund approved", "category": "late_delivery"},
+    {"id": "R-WRONG-ITEM", "conditions": {"order_status": "wrong_item"}, "decision": "refund", "confidence": 0.85, "reason": "Wrong item - refund policy applies", "category": "wrong_item"},
+    {"id": "R-LOW-RATING", "conditions": {"order_status": "late_delivery", "courier_rating": {"op": "lt", "value": 4.0}}, "decision": "refund", "confidence": 0.80, "reason": "Delay due to courier issues", "category": "late_delivery"}
   ]
 }
